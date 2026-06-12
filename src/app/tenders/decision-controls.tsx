@@ -1,13 +1,16 @@
 import { updateTenderDecision } from "./actions";
+import { pick, type Locale } from "@/lib/i18n/locale";
 
 export function DecisionControls({
   tenderId,
   status,
   compact = false,
+  locale = "en",
 }: {
   tenderId: string;
   status: "SAVED" | "IGNORED" | null;
   compact?: boolean;
+  locale?: Locale;
 }) {
   const buttonClass = compact
     ? "rounded-lg border px-3 py-1.5 text-xs font-semibold"
@@ -26,7 +29,9 @@ export function DecisionControls({
               : "border-[var(--border)] bg-white hover:border-[var(--accent)]"
           }`}
         >
-          {status === "SAVED" ? "Saved" : "Save"}
+          {status === "SAVED"
+            ? pick(locale, "Saved", "محفوظة")
+            : pick(locale, "Save", "حفظ")}
         </button>
       </form>
       <form action={updateTenderDecision}>
@@ -40,7 +45,9 @@ export function DecisionControls({
               : "border-[var(--border)] bg-white hover:border-[var(--muted)]"
           }`}
         >
-          {status === "IGNORED" ? "Ignored" : "Ignore"}
+          {status === "IGNORED"
+            ? pick(locale, "Ignored", "مستبعدة")
+            : pick(locale, "Ignore", "استبعاد")}
         </button>
       </form>
       {status && (
@@ -51,7 +58,7 @@ export function DecisionControls({
             type="submit"
             className={`${buttonClass} border-transparent text-[var(--muted)] hover:text-[var(--foreground)]`}
           >
-            Undo
+            {pick(locale, "Undo", "تراجع")}
           </button>
         </form>
       )}

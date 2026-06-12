@@ -3,6 +3,7 @@
 import { generateTenderSummary, TENDER_SUMMARY_PROMPT_VERSION } from "@/lib/ai/generate-tender-summary";
 import { buildTenderSummaryContext } from "@/lib/ai/tender-summary-context";
 import { prisma } from "@/lib/prisma";
+import { parseLocale, pick } from "@/lib/i18n/locale";
 import { revalidatePath } from "next/cache";
 
 export type SummaryActionState = {
@@ -31,6 +32,11 @@ export async function generateTenderSummaryAction(
 ): Promise<SummaryActionState> {
   try {
     const tenderId = readTenderId(formData);
+    const locale = parseLocale(
+      typeof formData.get("locale") === "string"
+        ? String(formData.get("locale"))
+        : undefined,
+    );
     const [tender, companyProfile] = await Promise.all([
       prisma.tender.findUnique({
         where: { id: tenderId },
@@ -40,7 +46,10 @@ export async function generateTenderSummaryAction(
     ]);
 
     if (!tender) {
-      return { status: "error", message: "Tender not found." };
+      return {
+        status: "error",
+        message: pick(locale, "Tender not found.", "لم يتم العثور على المنافسة."),
+      };
     }
 
     const context = buildTenderSummaryContext(tender, companyProfile);
@@ -67,7 +76,11 @@ export async function generateTenderSummaryAction(
 
     return {
       status: "success",
-      message: "A new grounded summary version was generated and stored.",
+      message: pick(
+        locale,
+        "A new grounded summary version was generated and stored.",
+        "تم إنشاء نسخة جديدة من الملخص الموثق وتخزينها.",
+      ),
     };
   } catch (error) {
     return {

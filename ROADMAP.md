@@ -668,7 +668,9 @@ Make the product usable in both Arabic and English.
 - RTL support
 - Arabic tender data
 - English tender data when available
-- AI translation for missing English fields if needed
+- honest Arabic fallback when English tender fields are unavailable
+- AI translation for missing English fields later, only if evaluation shows it
+  is useful and grounded
 
 ### Learn only what is needed
 
@@ -680,6 +682,10 @@ Make the product usable in both Arabic and English.
 ### Done when
 
 A user can switch between Arabic and English.
+
+Status: Complete on 2026-06-12. The interface, dates, navigation, controls, and
+deterministic matching explanations switch between English/LTR and Arabic/RTL.
+Stored AI summaries remain English-only by current product decision.
 
 ---
 

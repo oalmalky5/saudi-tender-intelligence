@@ -2,18 +2,23 @@ import { prisma } from "@/lib/prisma";
 import { scoreTenderMatch } from "@/lib/matching/score-tender";
 import Link from "next/link";
 import { DecisionControls } from "../decision-controls";
+import { LanguageSwitcher } from "@/app/language-switcher";
+import { dateLocale, pick, type Locale } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/locale-server";
+import { localizeMatchText } from "@/lib/i18n/match-text";
+import { localizedTenderText } from "@/lib/i18n/tender-text";
 
 export const dynamic = "force-dynamic";
 
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "Asia/Riyadh",
-});
-
-function formatDate(date: Date | null): string {
-  return date ? dateFormatter.format(date) : "Not provided";
+function formatDate(date: Date | null, locale: Locale): string {
+  return date
+    ? new Intl.DateTimeFormat(dateLocale(locale), {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "Asia/Riyadh",
+      }).format(date)
+    : pick(locale, "Not provided", "غير متاح");
 }
 
 function scoreTone(score: number): string {
@@ -27,6 +32,7 @@ function scoreTone(score: number): string {
 }
 
 export default async function RecommendedTendersPage() {
+  const locale = await getLocale();
   const [profile, tenders] = await Promise.all([
     prisma.companyProfile.findUnique({ where: { id: "primary" } }),
     prisma.tender.findMany({
@@ -37,6 +43,7 @@ export default async function RecommendedTendersPage() {
         id: true,
         referenceNumber: true,
         titleArabic: true,
+        titleEnglish: true,
         descriptionArabic: true,
         agencyNameArabic: true,
         activityNameArabic: true,
@@ -71,15 +78,17 @@ export default async function RecommendedTendersPage() {
       <header className="border-b border-[var(--border)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
           <Link href="/tenders" className="font-semibold hover:text-[var(--accent)]">
-            ← Discover tenders
+            <span className="rtl-flip inline-block">←</span>{" "}
+            {pick(locale, "Discover tenders", "اكتشاف المنافسات")}
           </Link>
           <div className="flex items-center gap-4 text-sm font-semibold">
             <Link href="/company" className="hover:text-[var(--accent)]">
-              Company profile
+              {pick(locale, "Company profile", "ملف الشركة")}
             </Link>
             <Link href="/tenders/saved" className="hover:text-[var(--accent)]">
-              Saved
+              {pick(locale, "Saved", "المحفوظة")}
             </Link>
+            <LanguageSwitcher locale={locale} />
           </div>
         </div>
       </header>
@@ -87,29 +96,27 @@ export default async function RecommendedTendersPage() {
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         <section className="border-b border-[var(--border)] pb-9">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-            Rule-based matching
+            {pick(locale, "Rule-based matching", "مطابقة قائمة على القواعد")}
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
-            Recommended opportunities
+            {pick(locale, "Recommended opportunities", "الفرص الموصى بها")}
           </h1>
           <p className="mt-4 max-w-3xl leading-7 text-[var(--muted)]">
-            Tenders are ranked using explicit company preferences and available
-            public data. Scores indicate relevance, not confirmed eligibility.
+            {pick(locale, "Tenders are ranked using explicit company preferences and available public data. Scores indicate relevance, not confirmed eligibility.", "يتم ترتيب المنافسات باستخدام تفضيلات الشركة الصريحة والبيانات العامة المتاحة. تشير الدرجات إلى الصلة، وليس إلى أهلية مؤكدة.")}
           </p>
         </section>
 
         {!profile ? (
           <section className="mt-8 rounded-3xl border border-dashed border-[var(--border-strong)] bg-white px-6 py-16 text-center">
-            <h2 className="text-xl font-semibold">Create a company profile first</h2>
+            <h2 className="text-xl font-semibold">{pick(locale, "Create a company profile first", "أنشئ ملف الشركة أولاً")}</h2>
             <p className="mt-2 text-[var(--muted)]">
-              Recommendations need structured services, activities, keywords,
-              and preferences.
+              {pick(locale, "Recommendations need structured services, activities, keywords, and preferences.", "تحتاج التوصيات إلى خدمات وأنشطة وكلمات مفتاحية وتفضيلات منظمة.")}
             </p>
             <Link
               href="/company"
               className="mt-5 inline-flex rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white"
             >
-              Create company profile
+              {pick(locale, "Create company profile", "إنشاء ملف الشركة")}
             </Link>
           </section>
         ) : (
@@ -119,30 +126,33 @@ export default async function RecommendedTendersPage() {
                 <div>
                   <p className="font-semibold">{profile.companyName}</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    Found {recommendations.length} relevant candidates from{" "}
-                    {tenders.length} non-ignored tenders.
+                    {pick(locale, "Found", "تم العثور على")} {recommendations.length}{" "}
+                    {pick(locale, "relevant candidates from", "مرشحاً مناسباً من")}{" "}
+                    {tenders.length} {pick(locale, "non-ignored tenders.", "منافسة غير مستبعدة.")}
                   </p>
                 </div>
                 <Link
                   href="/company"
                   className="text-sm font-semibold text-[var(--accent)] hover:underline"
                 >
-                  Edit matching profile →
+                  {pick(locale, "Edit matching profile", "تعديل ملف المطابقة")} <span className="rtl-flip inline-block">→</span>
                 </Link>
               </div>
             </section>
 
             {recommendations.length === 0 ? (
               <section className="mt-8 rounded-3xl border border-dashed border-[var(--border-strong)] bg-white px-6 py-16 text-center">
-                <h2 className="text-xl font-semibold">No explicit matches yet</h2>
+                <h2 className="text-xl font-semibold">{pick(locale, "No explicit matches yet", "لا توجد مطابقات صريحة بعد")}</h2>
                 <p className="mt-2 text-[var(--muted)]">
-                  Add more activities, services, keywords, or target entities
-                  to the company profile.
+                  {pick(locale, "Add more activities, services, keywords, or target entities to the company profile.", "أضف المزيد من الأنشطة أو الخدمات أو الكلمات المفتاحية أو الجهات المستهدفة إلى ملف الشركة.")}
                 </p>
               </section>
             ) : (
               <div className="mt-6 grid gap-5">
                 {recommendations.map(({ tender, match }) => (
+                (() => {
+                  const title = localizedTenderText(locale, tender.titleEnglish, tender.titleArabic);
+                  return (
                 <article
                   key={tender.id}
                   className="rounded-3xl border border-[var(--border)] bg-white p-5 sm:p-7"
@@ -154,22 +164,24 @@ export default async function RecommendedTendersPage() {
                       >
                         <span className="text-2xl font-semibold">{match.score}%</span>
                         <span className="text-[10px] font-semibold uppercase tracking-wide">
-                          relevance
+                          {pick(locale, "relevance", "صلة")}
                         </span>
                       </div>
                     </div>
 
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-[var(--muted)]">
-                        Ref. {tender.referenceNumber}
+                        {pick(locale, "Ref.", "المرجع")} {tender.referenceNumber}
                       </p>
                       <Link
                         href={`/tenders/${tender.id}`}
-                        dir="rtl"
-                        lang="ar"
-                        className="mt-2 block text-right text-xl font-semibold leading-8 hover:text-[var(--accent)]"
+                        dir={title.direction}
+                        lang={title.language}
+                        className={`mt-2 block text-xl font-semibold leading-8 hover:text-[var(--accent)] ${
+                          title.direction === "rtl" ? "text-right" : ""
+                        }`}
                       >
-                        {tender.titleArabic}
+                        {title.value}
                       </Link>
                       <p
                         dir="rtl"
@@ -182,26 +194,26 @@ export default async function RecommendedTendersPage() {
                       {match.reasons.length > 0 ? (
                         <div className="mt-5">
                           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--accent)]">
-                            Why it matches
+                            {pick(locale, "Why it matches", "أسباب المطابقة")}
                           </p>
                           <ul className="mt-2 grid gap-1.5 text-sm leading-6">
                             {match.reasons.map((reason) => (
-                              <li key={reason}>+ {reason}</li>
+                              <li key={reason}>+ {localizeMatchText(reason, locale)}</li>
                             ))}
                           </ul>
                         </div>
                       ) : (
                         <p className="mt-5 text-sm text-[var(--muted)]">
-                          No explicit profile preferences matched.
+                          {pick(locale, "No explicit profile preferences matched.", "لم تتطابق تفضيلات صريحة من ملف الشركة.")}
                         </p>
                       )}
 
                       {match.concerns.length > 0 && (
                         <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
-                          <p className="font-semibold">Possible concerns</p>
+                          <p className="font-semibold">{pick(locale, "Possible concerns", "مخاوف محتملة")}</p>
                           <ul className="mt-1.5 grid gap-1 leading-6">
                             {match.concerns.map((concern) => (
-                              <li key={concern}>- {concern}</li>
+                              <li key={concern}>- {localizeMatchText(concern, locale)}</li>
                             ))}
                           </ul>
                         </div>
@@ -210,27 +222,30 @@ export default async function RecommendedTendersPage() {
 
                     <div className="border-t border-[var(--border)] pt-4 text-sm lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
                       <p className="text-xs text-[var(--muted)]">
-                        Submission deadline
+                        {pick(locale, "Submission deadline", "آخر موعد للتقديم")}
                       </p>
                       <p className="mt-1 font-semibold">
-                        {formatDate(tender.submissionDeadline)}
+                        {formatDate(tender.submissionDeadline, locale)}
                       </p>
                       <p className="mt-4 text-xs text-[var(--muted)]">
-                        Activity
+                        {pick(locale, "Activity", "النشاط")}
                       </p>
                       <p dir="rtl" lang="ar" className="mt-1 text-right">
-                        {tender.activityNameArabic ?? "Not provided"}
+                        {tender.activityNameArabic ?? pick(locale, "Not provided", "غير متاح")}
                       </p>
                       <div className="mt-5">
                         <DecisionControls
                           tenderId={tender.id}
                           status={tender.decision?.status ?? null}
                           compact
+                          locale={locale}
                         />
                       </div>
                     </div>
                   </div>
                 </article>
+                  );
+                })()
                 ))}
               </div>
             )}

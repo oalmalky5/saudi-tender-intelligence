@@ -743,3 +743,62 @@ Booklet analysis should remain selective and manual. The app should extract and
 clean PDF text locally, show an estimated AI cost, analyze an unchanged booklet
 once, cache the result, and cite source pages. The analysis can improve
 eligibility review but must not guarantee eligibility or winning.
+
+## Session 12 - Bilingual Interface and RTL
+
+### Concepts Learned
+
+- **Locale persistence:** A small browser cookie stores the selected `en` or
+  `ar` locale without adding locale segments to every URL.
+- **Server-rendered direction:** The root layout reads the locale and sets the
+  document `lang` and `dir`, so Arabic pages render RTL from the server.
+- **Client/server boundaries:** Pure locale helpers are separate from the
+  server-only cookie reader because client components cannot import
+  `next/headers`.
+- **Source-language boundaries:** Interface language and tender-data language
+  are separate. Arabic source fields keep Arabic direction even in the English
+  interface.
+- **Honest fallback:** The English interface prefers stored English tender
+  fields, then falls back to the original Arabic instead of inventing a
+  translation.
+- **Localized explanations:** Deterministic match reasons and concerns are
+  translated using deterministic templates rather than an AI call.
+- **AI-output boundary:** Stored AI summaries remain English-only for now,
+  following the earlier product decision and avoiding silent translation drift.
+
+### Locale Flow
+
+```text
+Language button
+    ↓ writes etimad-locale cookie
+Router refresh
+    ↓
+Root layout sets lang + dir
+    ↓
+Pages localize labels, dates, controls, and explanations
+    ↓
+Tender text prefers selected language when stored, otherwise uses Arabic source
+```
+
+### Files
+
+- `src/lib/i18n/locale.ts` contains browser-safe locale helpers.
+- `src/lib/i18n/locale-server.ts` reads the locale cookie on the server.
+- `src/lib/i18n/tender-text.ts` selects English tender fields with Arabic
+  fallback.
+- `src/lib/i18n/match-text.ts` localizes deterministic matching explanations.
+- `src/app/language-switcher.tsx` changes the selected locale.
+
+### You Should Be Able To Explain
+
+- Why `next/headers` cannot live in a module imported by a client component.
+- Why `lang` and `dir` should be set at the document root.
+- Why source content direction can differ from interface direction.
+- Why missing English tender text falls back to Arabic instead of automatic AI
+  translation.
+- Why deterministic match explanations should not require paid AI translation.
+
+### Next Session
+
+Plan Milestone 9 AI tender matching and define how it improves semantic and
+bilingual understanding without replacing deterministic scoring.

@@ -9,18 +9,22 @@ import {
 } from "@/lib/tenders/search";
 import Link from "next/link";
 import { DecisionControls } from "./decision-controls";
+import { LanguageSwitcher } from "@/app/language-switcher";
+import { dateLocale, pick, type Locale } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/locale-server";
+import { localizedTenderText } from "@/lib/i18n/tender-text";
 
 export const dynamic = "force-dynamic";
 
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "Asia/Riyadh",
-});
-
-function formatDate(date: Date | null): string {
-  return date ? dateFormatter.format(date) : "Not provided";
+function formatDate(date: Date | null, locale: Locale): string {
+  return date
+    ? new Intl.DateTimeFormat(dateLocale(locale), {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "Asia/Riyadh",
+      }).format(date)
+    : pick(locale, "Not provided", "غير متاح");
 }
 
 function buildPageHref(search: TenderSearch, page: number): string {
@@ -78,6 +82,7 @@ export default async function TendersPage({
   searchParams: Promise<TenderSearchParams>;
 }) {
   const search = parseTenderSearchParams(await searchParams);
+  const locale = await getLocale();
   const searchWhere = buildTenderWhere(search);
   const where = {
     AND: [
@@ -98,6 +103,7 @@ export default async function TendersPage({
           id: true,
           referenceNumber: true,
           titleArabic: true,
+          titleEnglish: true,
           agencyNameArabic: true,
           branchNameArabic: true,
           activityNameArabic: true,
@@ -156,7 +162,7 @@ export default async function TendersPage({
               Etimad Intelligence
             </p>
             <p className="text-sm text-[var(--muted)]">
-              Saudi public tender discovery
+              {pick(locale, "Saudi public tender discovery", "اكتشاف المنافسات الحكومية السعودية")}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -164,23 +170,24 @@ export default async function TendersPage({
               href="/tenders/recommended"
               className="text-sm font-semibold hover:text-[var(--accent)]"
             >
-              Recommended
+              {pick(locale, "Recommended", "الموصى بها")}
             </Link>
             <Link
               href="/company"
               className="text-sm font-semibold hover:text-[var(--accent)]"
             >
-              Company profile
+              {pick(locale, "Company profile", "ملف الشركة")}
             </Link>
             <Link
               href="/tenders/saved"
               className="text-sm font-semibold hover:text-[var(--accent)]"
             >
-              Saved workspace
+              {pick(locale, "Saved workspace", "مساحة العمل المحفوظة")}
             </Link>
             <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)]">
-              Live Etimad data
+              {pick(locale, "Live Etimad data", "بيانات اعتماد مباشرة")}
             </span>
+            <LanguageSwitcher locale={locale} />
           </div>
         </div>
       </header>
@@ -189,22 +196,21 @@ export default async function TendersPage({
         <section className="grid gap-8 border-b border-[var(--border)] pb-10 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-              Tender workspace
+              {pick(locale, "Tender workspace", "مساحة المنافسات")}
             </p>
             <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
-              Find the opportunities that matter.
+              {pick(locale, "Find the opportunities that matter.", "اعثر على الفرص التي تهمك.")}
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-              Search original Arabic tender content and narrow results using
-              fields stored in your own database.
+              {pick(locale, "Search original Arabic tender content and narrow results using fields stored in your own database.", "ابحث في محتوى المنافسات العربي الأصلي وضيّق النتائج باستخدام البيانات المخزنة في قاعدة بياناتك.")}
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
-              ["Results", resultCount],
-              ["Agencies", agencies.length],
-              ["Activities", activities.length],
+              [pick(locale, "Results", "النتائج"), resultCount],
+              [pick(locale, "Agencies", "الجهات"), agencies.length],
+              [pick(locale, "Activities", "الأنشطة"), activities.length],
             ].map(([label, value]) => (
               <div
                 key={label}
@@ -223,26 +229,26 @@ export default async function TendersPage({
         >
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))]">
             <label className="grid gap-1.5 text-sm font-medium">
-              Keyword or reference number
+              {pick(locale, "Keyword or reference number", "كلمة مفتاحية أو رقم مرجعي")}
               <input
                 name="q"
                 defaultValue={search.q}
-                placeholder="Search title, description, agency..."
+                placeholder={pick(locale, "Search title, description, agency...", "ابحث في العنوان أو الوصف أو الجهة...")}
                 className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 font-normal outline-none focus:border-[var(--accent)]"
               />
             </label>
             <FilterSelect
-              label="Agency"
+              label={pick(locale, "Agency", "الجهة")}
               name="agency"
               defaultValue={search.agency}
-              allLabel="All agencies"
+              allLabel={pick(locale, "All agencies", "كل الجهات")}
               options={agencies.map((item) => item.agencyNameArabic)}
             />
             <FilterSelect
-              label="Activity"
+              label={pick(locale, "Activity", "النشاط")}
               name="activity"
               defaultValue={search.activity}
-              allLabel="All activities"
+              allLabel={pick(locale, "All activities", "كل الأنشطة")}
               options={activities.flatMap((item) =>
                 item.activityNameArabic ? [item.activityNameArabic] : [],
               )}
@@ -251,46 +257,46 @@ export default async function TendersPage({
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <FilterSelect
-              label="Execution region"
+              label={pick(locale, "Execution region", "منطقة التنفيذ")}
               name="region"
               defaultValue={search.region}
-              allLabel="All enriched regions"
+              allLabel={pick(locale, "All enriched regions", "كل المناطق المتاحة")}
               options={regions.flatMap((item) =>
                 item.executionRegionArabic ? [item.executionRegionArabic] : [],
               )}
             />
             <FilterSelect
-              label="Status"
+              label={pick(locale, "Status", "الحالة")}
               name="status"
               defaultValue={search.status}
-              allLabel="All statuses"
+              allLabel={pick(locale, "All statuses", "كل الحالات")}
               options={statuses.flatMap((item) =>
                 item.tenderStatusNameArabic ? [item.tenderStatusNameArabic] : [],
               )}
             />
             <label className="grid gap-1.5 text-sm font-medium">
-              Submission deadline
+              {pick(locale, "Submission deadline", "آخر موعد للتقديم")}
               <select
                 name="deadline"
                 defaultValue={search.deadline}
                 className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 font-normal outline-none focus:border-[var(--accent)]"
               >
-                <option value="any">Any deadline</option>
-                <option value="7">Closing within 7 days</option>
-                <option value="30">Closing within 30 days</option>
-                <option value="missing">Deadline not provided</option>
+                <option value="any">{pick(locale, "Any deadline", "أي موعد")}</option>
+                <option value="7">{pick(locale, "Closing within 7 days", "تغلق خلال 7 أيام")}</option>
+                <option value="30">{pick(locale, "Closing within 30 days", "تغلق خلال 30 يوماً")}</option>
+                <option value="missing">{pick(locale, "Deadline not provided", "الموعد غير متاح")}</option>
               </select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Sort results
+              {pick(locale, "Sort results", "ترتيب النتائج")}
               <select
                 name="sort"
                 defaultValue={search.sort}
                 className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 font-normal outline-none focus:border-[var(--accent)]"
               >
-                <option value="published-desc">Newest published</option>
-                <option value="deadline-asc">Deadline: soonest first</option>
-                <option value="deadline-desc">Deadline: latest first</option>
+                <option value="published-desc">{pick(locale, "Newest published", "الأحدث نشراً")}</option>
+                <option value="deadline-asc">{pick(locale, "Deadline: soonest first", "الموعد: الأقرب أولاً")}</option>
+                <option value="deadline-desc">{pick(locale, "Deadline: latest first", "الموعد: الأبعد أولاً")}</option>
               </select>
             </label>
           </div>
@@ -300,14 +306,14 @@ export default async function TendersPage({
               type="submit"
               className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
             >
-              Apply search and filters
+              {pick(locale, "Apply search and filters", "تطبيق البحث والفلاتر")}
             </button>
             {hasFilters && (
               <Link
                 href="/tenders"
                 className="px-2 py-2.5 text-sm font-semibold text-[var(--muted)] hover:text-[var(--accent)]"
               >
-                Clear all
+                {pick(locale, "Clear all", "مسح الكل")}
               </Link>
             )}
           </div>
@@ -317,25 +323,34 @@ export default async function TendersPage({
           <div className="mb-5 flex items-end justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold tracking-tight">
-                {hasFilters ? "Matching tenders" : "Recently published"}
+                {hasFilters
+                  ? pick(locale, "Matching tenders", "المنافسات المطابقة")
+                  : pick(locale, "Recently published", "الأحدث نشراً")}
               </h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                {resultCount} {resultCount === 1 ? "result" : "results"} · Page{" "}
-                {search.page} of {totalPages}
+                {resultCount} {pick(locale, resultCount === 1 ? "result" : "results", "نتيجة")} ·{" "}
+                {pick(locale, "Page", "صفحة")} {search.page} {pick(locale, "of", "من")} {totalPages}
               </p>
             </div>
           </div>
 
           {tenders.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-6 py-16 text-center">
-              <h2 className="text-xl font-semibold">No matching tenders</h2>
+              <h2 className="text-xl font-semibold">{pick(locale, "No matching tenders", "لا توجد منافسات مطابقة")}</h2>
               <p className="mt-2 text-[var(--muted)]">
-                Try removing a filter or using a broader keyword.
+                {pick(locale, "Try removing a filter or using a broader keyword.", "جرّب إزالة أحد الفلاتر أو استخدام كلمة أوسع.")}
               </p>
             </div>
           ) : (
             <div className="grid gap-4">
               {tenders.map((tender) => (
+                (() => {
+                  const title = localizedTenderText(
+                    locale,
+                    tender.titleEnglish,
+                    tender.titleArabic,
+                  );
+                  return (
                 <article
                   key={tender.id}
                   className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--border-strong)] hover:shadow-[0_12px_35px_rgba(20,55,43,0.07)] sm:p-6"
@@ -363,20 +378,22 @@ export default async function TendersPage({
                         )}
                         {tender.detailEnrichmentStatus === "complete" && (
                           <span className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 text-[var(--accent)]">
-                            Details enriched
+                            {pick(locale, "Details enriched", "التفاصيل مُثراة")}
                           </span>
                         )}
                         <span className="text-[var(--muted)]">
-                          Ref. {tender.referenceNumber}
+                          {pick(locale, "Ref.", "المرجع")} {tender.referenceNumber}
                         </span>
                       </div>
 
                       <h3
-                        dir="rtl"
-                        lang="ar"
-                        className="text-right text-xl font-semibold leading-8 tracking-tight"
+                        dir={title.direction}
+                        lang={title.language}
+                        className={`text-xl font-semibold leading-8 tracking-tight ${
+                          title.direction === "rtl" ? "text-right" : ""
+                        }`}
                       >
-                        {tender.titleArabic}
+                        {title.value}
                       </h3>
                       <div
                         dir="rtl"
@@ -394,18 +411,18 @@ export default async function TendersPage({
                       <dl className="grid grid-cols-2 gap-4 lg:grid-cols-1">
                         <div>
                           <dt className="text-xs text-[var(--muted)]">
-                            Published
+                            {pick(locale, "Published", "تاريخ النشر")}
                           </dt>
                           <dd className="mt-1 font-medium">
-                            {formatDate(tender.publishedAt)}
+                            {formatDate(tender.publishedAt, locale)}
                           </dd>
                         </div>
                         <div>
                           <dt className="text-xs text-[var(--muted)]">
-                            Submission deadline
+                            {pick(locale, "Submission deadline", "آخر موعد للتقديم")}
                           </dt>
                           <dd className="mt-1 font-semibold">
-                            {formatDate(tender.submissionDeadline)}
+                            {formatDate(tender.submissionDeadline, locale)}
                           </dd>
                         </div>
                       </dl>
@@ -415,24 +432,27 @@ export default async function TendersPage({
                         rel="noreferrer"
                         className="mt-5 inline-flex font-semibold text-[var(--accent)] hover:underline"
                       >
-                        View original on Etimad ↗
+                        {pick(locale, "View original on Etimad", "عرض الأصل في اعتماد")} ↗
                       </a>
                       <Link
                         href={`/tenders/${tender.id}`}
                         className="mt-3 block font-semibold text-[var(--foreground)] hover:text-[var(--accent)]"
                       >
-                        Open internal details →
+                        {pick(locale, "Open internal details", "فتح التفاصيل الداخلية")} <span className="rtl-flip inline-block">→</span>
                       </Link>
                       <div className="mt-4">
                         <DecisionControls
                           tenderId={tender.id}
                           status={tender.decision?.status ?? null}
                           compact
+                          locale={locale}
                         />
                       </div>
                     </div>
                   </div>
                 </article>
+                  );
+                })()
               ))}
             </div>
           )}
@@ -447,20 +467,20 @@ export default async function TendersPage({
                   href={buildPageHref(search, search.page - 1)}
                   className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold hover:border-[var(--accent)]"
                 >
-                  ← Previous
+                  <span className="rtl-flip inline-block">←</span> {pick(locale, "Previous", "السابق")}
                 </Link>
               ) : (
                 <span />
               )}
               <span className="text-sm text-[var(--muted)]">
-                Page {search.page} of {totalPages}
+                {pick(locale, "Page", "صفحة")} {search.page} {pick(locale, "of", "من")} {totalPages}
               </span>
               {search.page < totalPages ? (
                 <Link
                   href={buildPageHref(search, search.page + 1)}
                   className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold hover:border-[var(--accent)]"
                 >
-                  Next →
+                  {pick(locale, "Next", "التالي")} <span className="rtl-flip inline-block">→</span>
                 </Link>
               ) : (
                 <span />

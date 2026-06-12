@@ -114,6 +114,13 @@ stored data only, are validated before storage, preserve version history, and
 are marked stale after the tender or company profile changes. Review
 `AI_EVALS.md` before evaluating summaries across representative tenders.
 
+Use the language button in the application header to switch between English
+and Arabic. The selected locale is stored in a browser cookie, changes the
+document between LTR and RTL, localizes dates and interface labels, and prefers
+English tender fields when Etimad provides them. Original Arabic tender data is
+shown as the fallback when no English field exists. AI summaries currently
+remain English-only.
+
 ## Useful Checks
 
 ```bash
