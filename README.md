@@ -40,7 +40,7 @@ the database:
 npm run etimad:preview
 ```
 
-Import that validated page into PostgreSQL using idempotent upserts:
+Import up to five validated pages into PostgreSQL using idempotent upserts:
 
 ```bash
 npm run etimad:import
@@ -67,6 +67,9 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+The homepage redirects to `/tenders`, which displays up to 120 real tenders
+stored in the local database.
 
 ## Useful Checks
 

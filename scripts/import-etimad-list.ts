@@ -1,13 +1,13 @@
 import { ZodError } from "zod";
 
-import { fetchEtimadListPage } from "../src/lib/etimad/fetch-list-page";
+import { fetchEtimadListPages } from "../src/lib/etimad/fetch-list-pages";
 import { mapEtimadListTender } from "../src/lib/etimad/map-list-tender";
 import { persistTenderList } from "../src/lib/etimad/persist-list-tenders";
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
-  const page = await fetchEtimadListPage(1);
-  const tenders = page.data.map(mapEtimadListTender);
+  const pages = await fetchEtimadListPages(5);
+  const tenders = pages.tenders.map(mapEtimadListTender);
   const result = await persistTenderList(prisma, tenders);
 
   console.log("Etimad list import");
@@ -15,7 +15,8 @@ async function main() {
   console.log(`Validated: ${result.total}`);
   console.log(`Created: ${result.created}`);
   console.log(`Updated: ${result.updated}`);
-  console.log(`Active records reported by Etimad: ${page.totalCount}`);
+  console.log(`Pages fetched: ${pages.pagesFetched}`);
+  console.log(`Active records reported by Etimad: ${pages.totalCount}`);
 }
 
 main()

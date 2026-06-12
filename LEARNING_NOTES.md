@@ -242,3 +242,65 @@ npm test
 
 Import the first five active-tender pages, then build the first useful frontend
 page that browses real tenders from our own database.
+
+## Session 5 - Complete Phase 1 with the Tender List
+
+### Concepts Learned
+
+- **Sequential pagination:** The importer fetches five Etimad pages one after
+  another with a short delay, instead of sending a burst of simultaneous
+  requests.
+- **Cross-page deduplication:** Records are deduplicated by reference number
+  before they reach the persistence layer.
+- **Server component data fetching:** The `/tenders` page queries PostgreSQL
+  directly through Prisma while rendering on the server.
+- **Dynamic rendering:** The tender page is rendered on demand so it reflects
+  the current local database rather than becoming a build-time snapshot.
+- **Mixed-language interface:** Product navigation and labels are English,
+  while original Arabic tender content uses explicit right-to-left direction.
+- **Source transparency:** Every card links back to its original Etimad page.
+
+### Phase 1 Result
+
+The expanded importer fetched five live Etimad pages:
+
+```text
+Validated: 120
+Created: 96
+Updated: 24
+Pages fetched: 5
+```
+
+The app now renders all 120 stored records at `/tenders`. The homepage redirects
+to this first useful product page.
+
+### Files
+
+- `src/lib/etimad/fetch-list-pages.ts` performs conservative sequential
+  pagination and cross-page deduplication.
+- `scripts/import-etimad-list.ts` imports up to five active-tender pages.
+- `src/app/tenders/page.tsx` queries and renders stored tenders.
+- `src/app/page.tsx` redirects the homepage to the tender workspace.
+
+### Commands
+
+```bash
+npm run db:dev
+npm run etimad:import
+npm run dev
+```
+
+Then open `http://localhost:3000/tenders`.
+
+### You Should Be Able To Explain
+
+- Why the importer fetches Etimad pages sequentially.
+- Why records are deduplicated before persistence.
+- How a Next.js server component can query PostgreSQL without an API route.
+- Why `/tenders` uses dynamic rendering.
+- Why Arabic tender content has an explicit `dir="rtl"` attribute.
+
+### Next Session
+
+Begin Phase 2 by investigating and implementing public tender-detail
+enrichment for a selected tender.

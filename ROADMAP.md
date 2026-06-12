@@ -330,6 +330,8 @@ when Milestone 2 fetches and parses public tender details.
 You can manually run an import, open the browser, and browse real active Etimad
 tenders stored in your own database.
 
+Status: Complete on 2026-06-12.
+
 ---
 
 ## Milestone 2 — Tender Detail Page
