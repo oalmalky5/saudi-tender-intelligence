@@ -304,3 +304,276 @@ Then open `http://localhost:3000/tenders`.
 
 Begin Phase 2 by investigating and implementing public tender-detail
 enrichment for a selected tender.
+
+## Session 6 - Tender Detail Enrichment and Detail Page
+
+### Concepts Learned
+
+- **HTML parsing:** Etimad detail endpoints return HTML rather than JSON, so
+  Cheerio converts the markup into a traversable document structure.
+- **Label/value extraction:** The parser reads recurring Etimad label and value
+  classes instead of depending on fragile element positions.
+- **Raw snapshots:** The basic page and each public detail component are stored
+  unchanged for debugging when Etimad markup changes.
+- **Normalized enrichment:** Useful detail fields are written into dedicated
+  `Tender` columns for display and future search or matching.
+- **Enrichment status:** Each tender records whether public detail enrichment
+  is pending, complete, or failed, including the latest error.
+- **Dynamic route:** `/tenders/[id]` fetches one stored tender using the
+  identifier in the URL.
+- **Attachment metadata:** Public attachment names and source links are stored
+  without automatically downloading untrusted files.
+
+### Detail Data Flow
+
+```text
+Stored tender
+    ↓ manual enrichment
+Etimad basic detail page + public HTML components
+    ↓ structured HTML parsing
+normalized detail fields + raw snapshots + attachment metadata
+    ↓
+PostgreSQL → /tenders/[id]
+```
+
+### Real-Data Proof
+
+Reference `260639003513` was enriched successfully. Verification confirmed:
+
+```text
+Status: complete
+Description stored: 89 characters
+Execution region: مكة المكرمة
+Execution city: جدة
+Raw snapshot size: approximately 320 KB
+```
+
+The same tender was enriched again successfully, proving that detail
+enrichment can update an existing snapshot and normalized fields.
+
+### Files
+
+- `src/lib/etimad/fetch-tender-detail.ts` conservatively fetches the basic
+  detail page and public components.
+- `src/lib/etimad/parse-tender-detail.ts` parses and normalizes public fields.
+- `src/lib/etimad/persist-tender-detail.ts` stores normalized data, snapshots,
+  and attachment metadata transactionally.
+- `scripts/enrich-etimad-tender.ts` manually enriches one selected tender.
+- `src/app/tenders/[id]/page.tsx` renders the internal tender detail page.
+
+### Commands
+
+```bash
+npm run etimad:enrich
+npm run etimad:enrich -- 260639003513
+npm test
+```
+
+### You Should Be Able To Explain
+
+- Why HTML parsing is less stable than consuming documented JSON.
+- Why raw snapshots and normalized columns are both stored.
+- Why missing data is represented as unknown rather than false.
+- Why detail enrichment is manually triggered instead of fetching Etimad every
+  time someone opens a page.
+- How a dynamic `[id]` route loads one tender.
+- Why attachment files are not automatically downloaded.
+
+### Next Session
+
+Begin Milestone 3 by adding keyword search and useful tender filters.
+
+## Session 7 - Search, Filters, Sorting, and Pagination
+
+### Concepts Learned
+
+- **Query parameters:** Search state is represented in the URL, such as
+  `/tenders?q=تقنية&deadline=7`, making filtered views refreshable and
+  shareable.
+- **Server-side filtering:** Prisma translates search choices into PostgreSQL
+  conditions instead of loading every tender and filtering in the browser.
+- **Partial versus exact matching:** Keywords use partial matching across
+  titles, descriptions, agencies, activities, and identifiers. Dropdown
+  filters use exact stored values.
+- **Combined conditions:** Multiple active filters are joined with `AND`, while
+  keyword-search fields are joined with `OR`.
+- **Sorting:** Results can be ordered by publication date or submission
+  deadline, with missing deadlines placed last.
+- **Pagination:** The browser fetches 24 matching tenders per page and preserves
+  active filters in previous/next links.
+- **Closing-soon window:** Deadline filters compare submission dates with the
+  current date and a seven- or thirty-day future boundary.
+
+### Search Data Flow
+
+```text
+/tenders query parameters
+        ↓ validation and normalization
+Prisma where + orderBy + skip + take
+        ↓
+PostgreSQL filtered results and count
+        ↓
+shareable paginated tender browser
+```
+
+### Real-Data Proof
+
+Live verification against the local 120-tender dataset confirmed:
+
+```text
+Default page: 24 tender cards
+Page 2: 24 tender cards with previous/next navigation
+Reference search 260639003513: 1 result
+Execution region مكة المكرمة: 1 result
+```
+
+### Files
+
+- `src/lib/tenders/search.ts` validates query parameters and builds Prisma
+  filtering and sorting objects.
+- `src/lib/tenders/search.test.ts` verifies parameter normalization,
+  closing-soon conditions, and deadline sorting.
+- `src/app/tenders/page.tsx` renders controls, filtered results, and pagination.
+
+### You Should Be Able To Explain
+
+- Why search state belongs in URL query parameters.
+- Why database filtering scales better than browser-only filtering.
+- Why keyword fields use `OR` inside the wider `AND` filter.
+- How `skip` and `take` implement pagination.
+- Why missing submission deadlines are sorted last.
+- Why region filtering currently applies only to enriched tenders.
+
+### Next Session
+
+Begin Milestone 4 by adding saved, ignored, and note-taking workflows.
+
+## Session 8 - Save, Ignore, and Tender Notes
+
+### Concepts Learned
+
+- **Relational ownership:** Etimad source fields remain on `Tender`, while
+  local user decisions live in a separate one-to-one `TenderDecision` record.
+- **Nullable decision status:** A decision can be saved, ignored, or neutral.
+  Notes can exist independently of the current status.
+- **Server actions:** Forms call server-side functions that validate form data,
+  write through Prisma, and revalidate affected pages.
+- **Reversible workflow:** Save and Ignore can replace each other or be cleared
+  with Undo.
+- **Default exclusion:** Ignored tenders are excluded from the main browser at
+  the database-query level.
+- **Decision workspace:** Saved and ignored tenders remain reviewable on a
+  dedicated page, including stored notes.
+
+### Decision Data Flow
+
+```text
+Save / Ignore / Undo / Note form
+        ↓ server action validation
+TenderDecision upsert
+        ↓ page revalidation
+tender browser + detail page + decision workspace
+```
+
+### Real-Data Proof
+
+Temporary saved and ignored decisions were created against real local tenders.
+Verification confirmed:
+
+```text
+Ignored tender hidden from default browser
+Saved tender visible in saved workspace
+Ignored tender visible and reversible in ignored workspace
+Stored note visible in saved workspace and detail page
+```
+
+The temporary verification decisions were removed afterward.
+
+### Files
+
+- `src/app/tenders/actions.ts` validates and persists decision and note forms.
+- `src/app/tenders/decision-controls.tsx` provides reusable Save, Ignore, and
+  Undo controls.
+- `src/app/tenders/saved/page.tsx` displays saved and ignored tenders.
+- `src/app/tenders/page.tsx` hides ignored results and shows decision controls.
+- `src/app/tenders/[id]/page.tsx` supports decisions and tender notes.
+
+### You Should Be Able To Explain
+
+- Why local decisions should not be stored as Etimad source fields.
+- Why one tender has at most one local decision record in this single-user
+  prototype.
+- How a server action receives and validates form data.
+- Why ignored tenders are hidden in the database query rather than CSS.
+- Why Undo is necessary for a reversible decision workflow.
+
+### Next Session
+
+Begin Milestone 5 by creating and editing the first company profile.
+
+## Session 9 - Company Profile
+
+### Concepts Learned
+
+- **Product profile modeling:** A lightweight company profile captures what the
+  company does and what opportunities it wants without requiring sensitive
+  documents.
+- **PostgreSQL arrays:** Services, activities, industries, entities, regions,
+  keywords, exclusions, and opportunity types are stored as typed string
+  arrays.
+- **Form normalization:** Comma- and newline-separated text is trimmed,
+  deduplicated, and converted into arrays before validation.
+- **Zod form validation:** Required identity fields and all preference arrays
+  are validated before database writes.
+- **Singleton prototype record:** The current local single-user app upserts one
+  `primary` company profile. Multi-company ownership can be introduced with
+  authentication later.
+- **Editable preferences:** Stored profile data is loaded back into the form so
+  users can revise matching inputs over time.
+
+### Profile Data Flow
+
+```text
+Company profile form
+        ↓ normalize comma/newline lists
+Zod validation
+        ↓
+CompanyProfile upsert
+        ↓
+editable structured matching inputs
+```
+
+### Real-Data Proof
+
+A temporary non-sensitive profile was created and edited successfully:
+
+```text
+Services stored: 2
+Preferred keywords updated: innovation, strategy, transformation
+Preferred opportunity type stored: منافسة عامة
+```
+
+The profile page rendered the edited values and was reachable from the tender
+browser. The temporary profile was removed afterward so the real form starts
+clean.
+
+### Files
+
+- `src/lib/company/profile-schema.ts` validates and normalizes profile input.
+- `src/lib/company/profile-schema.test.ts` verifies list parsing and required
+  fields.
+- `src/app/company/actions.ts` validates and upserts the primary profile.
+- `src/app/company/page.tsx` creates and edits the company profile.
+
+### You Should Be Able To Explain
+
+- Why the first matching profile does not require private company documents.
+- Why profile lists are stored as arrays rather than one large text field.
+- How list normalization differs from validation.
+- Why the prototype currently uses one stable `primary` profile ID.
+- Which company-profile fields will influence rule-based matching.
+
+### Next Session
+
+Begin Milestone 6 by ranking tenders with an explainable, non-AI scoring
+function.

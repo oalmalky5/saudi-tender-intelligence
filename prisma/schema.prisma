@@ -56,15 +56,85 @@ model Tender {
   isUgrp            Boolean  @default(false)
   externalSourceUrl String?
 
-  sourcePayload     Json
-  detailsEnrichedAt DateTime?
-  firstSeenAt       DateTime  @default(now())
-  lastSeenAt        DateTime  @default(now())
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  sourcePayload          Json
+  detailEnrichmentStatus String    @default("pending")
+  detailEnrichmentError  String?   @db.Text
+  detailsEnrichedAt      DateTime?
+  firstSeenAt            DateTime  @default(now())
+  lastSeenAt             DateTime  @default(now())
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  detailSnapshot TenderDetailSnapshot?
+  attachments    TenderAttachment[]
+  decision       TenderDecision?
 
   @@index([agencyNameArabic])
   @@index([activityNameArabic])
   @@index([publishedAt])
   @@index([submissionDeadline])
+}
+
+enum TenderDecisionStatus {
+  SAVED
+  IGNORED
+}
+
+model TenderDecision {
+  id        String                @id @default(cuid())
+  tenderId  String                @unique
+  status    TenderDecisionStatus?
+  note      String?               @db.Text
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model TenderAttachment {
+  id                  String   @id @default(cuid())
+  tenderId            String
+  sourceAttachmentKey String
+  nameArabic          String
+  sourceUrl           String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@unique([tenderId, sourceAttachmentKey])
+}
+
+model TenderDetailSnapshot {
+  id               String   @id @default(cuid())
+  tenderId         String   @unique
+  basicHtml        String   @db.Text
+  datesHtml        String   @db.Text
+  relationsHtml    String   @db.Text
+  attachmentsHtml  String   @db.Text
+  localContentHtml String   @db.Text
+  awardingHtml     String   @db.Text
+  parsedPayload    Json
+  fetchedAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+}
+
+model CompanyProfile {
+  id                        String   @id
+  companyName               String
+  summary                   String   @db.Text
+  services                  String[] @default([])
+  activities                String[] @default([])
+  industries                String[] @default([])
+  targetGovernmentEntities  String[] @default([])
+  regions                   String[] @default([])
+  preferredKeywords         String[] @default([])
+  excludedKeywords          String[] @default([])
+  preferredOpportunityTypes String[] @default([])
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 }

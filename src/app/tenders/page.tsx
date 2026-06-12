@@ -1,4 +1,14 @@
 import { prisma } from "@/lib/prisma";
+import {
+  buildTenderOrderBy,
+  buildTenderWhere,
+  parseTenderSearchParams,
+  TENDERS_PER_PAGE,
+  type TenderSearch,
+  type TenderSearchParams,
+} from "@/lib/tenders/search";
+import Link from "next/link";
+import { DecisionControls } from "./decision-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -13,32 +23,129 @@ function formatDate(date: Date | null): string {
   return date ? dateFormatter.format(date) : "Not provided";
 }
 
-export default async function TendersPage() {
-  const tenders = await prisma.tender.findMany({
-    orderBy: [{ publishedAt: "desc" }, { referenceNumber: "asc" }],
-    take: 120,
-    select: {
-      id: true,
-      referenceNumber: true,
-      titleArabic: true,
-      agencyNameArabic: true,
-      branchNameArabic: true,
-      activityNameArabic: true,
-      tenderTypeNameArabic: true,
-      publishedAt: true,
-      submissionDeadline: true,
-      sourceUrl: true,
-    },
-  });
+function buildPageHref(search: TenderSearch, page: number): string {
+  const params = new URLSearchParams();
 
-  const agencyCount = new Set(
-    tenders.map((tender) => tender.agencyNameArabic),
-  ).size;
-  const activityCount = new Set(
-    tenders
-      .map((tender) => tender.activityNameArabic)
-      .filter((activity) => activity !== null),
-  ).size;
+  for (const [key, value] of Object.entries(search)) {
+    if (key !== "page" && value && value !== "any" && value !== "published-desc") {
+      params.set(key, String(value));
+    }
+  }
+
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+
+  const query = params.toString();
+  return query ? `/tenders?${query}` : "/tenders";
+}
+
+function FilterSelect({
+  label,
+  name,
+  defaultValue,
+  options,
+  allLabel,
+}: {
+  label: string;
+  name: string;
+  defaultValue: string;
+  options: string[];
+  allLabel: string;
+}) {
+  return (
+    <label className="grid gap-1.5 text-sm font-medium">
+      {label}
+      <select
+        name={name}
+        defaultValue={defaultValue}
+        className="min-w-0 rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 font-normal outline-none focus:border-[var(--accent)]"
+      >
+        <option value="">{allLabel}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+export default async function TendersPage({
+  searchParams,
+}: {
+  searchParams: Promise<TenderSearchParams>;
+}) {
+  const search = parseTenderSearchParams(await searchParams);
+  const searchWhere = buildTenderWhere(search);
+  const where = {
+    AND: [
+      searchWhere,
+      { NOT: { decision: { is: { status: "IGNORED" as const } } } },
+    ],
+  };
+  const orderBy = buildTenderOrderBy(search.sort);
+
+  const [tenders, resultCount, agencies, activities, regions, statuses] =
+    await Promise.all([
+      prisma.tender.findMany({
+        where,
+        orderBy,
+        skip: (search.page - 1) * TENDERS_PER_PAGE,
+        take: TENDERS_PER_PAGE,
+        select: {
+          id: true,
+          referenceNumber: true,
+          titleArabic: true,
+          agencyNameArabic: true,
+          branchNameArabic: true,
+          activityNameArabic: true,
+          tenderTypeNameArabic: true,
+          tenderStatusNameArabic: true,
+          executionRegionArabic: true,
+          publishedAt: true,
+          submissionDeadline: true,
+          sourceUrl: true,
+          detailEnrichmentStatus: true,
+          decision: { select: { status: true } },
+        },
+      }),
+      prisma.tender.count({ where }),
+      prisma.tender.findMany({
+        distinct: ["agencyNameArabic"],
+        orderBy: { agencyNameArabic: "asc" },
+        select: { agencyNameArabic: true },
+      }),
+      prisma.tender.findMany({
+        where: { activityNameArabic: { not: null } },
+        distinct: ["activityNameArabic"],
+        orderBy: { activityNameArabic: "asc" },
+        select: { activityNameArabic: true },
+      }),
+      prisma.tender.findMany({
+        where: { executionRegionArabic: { not: null } },
+        distinct: ["executionRegionArabic"],
+        orderBy: { executionRegionArabic: "asc" },
+        select: { executionRegionArabic: true },
+      }),
+      prisma.tender.findMany({
+        where: { tenderStatusNameArabic: { not: null } },
+        distinct: ["tenderStatusNameArabic"],
+        orderBy: { tenderStatusNameArabic: "asc" },
+        select: { tenderStatusNameArabic: true },
+      }),
+    ]);
+
+  const totalPages = Math.max(1, Math.ceil(resultCount / TENDERS_PER_PAGE));
+  const hasFilters =
+    search.q ||
+    search.agency ||
+    search.activity ||
+    search.region ||
+    search.status ||
+    search.deadline !== "any" ||
+    search.sort !== "published-desc";
 
   return (
     <main className="min-h-screen">
@@ -52,9 +159,23 @@ export default async function TendersPage() {
               Saudi public tender discovery
             </p>
           </div>
-          <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)]">
-            Live Etimad data
-          </span>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/company"
+              className="text-sm font-semibold hover:text-[var(--accent)]"
+            >
+              Company profile
+            </Link>
+            <Link
+              href="/tenders/saved"
+              className="text-sm font-semibold hover:text-[var(--accent)]"
+            >
+              Saved workspace
+            </Link>
+            <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)]">
+              Live Etimad data
+            </span>
+          </div>
         </div>
       </header>
 
@@ -65,19 +186,19 @@ export default async function TendersPage() {
               Tender workspace
             </p>
             <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
-              Active opportunities, gathered in one place.
+              Find the opportunities that matter.
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-              Browse real public tenders imported from Etimad. Search,
-              matching, and English summaries arrive in later milestones.
+              Search original Arabic tender content and narrow results using
+              fields stored in your own database.
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
-              ["Tenders", tenders.length],
-              ["Agencies", agencyCount],
-              ["Activities", activityCount],
+              ["Results", resultCount],
+              ["Agencies", agencies.length],
+              ["Activities", activities.length],
             ].map(([label, value]) => (
               <div
                 key={label}
@@ -90,27 +211,120 @@ export default async function TendersPage() {
           </div>
         </section>
 
+        <form
+          action="/tenders"
+          className="mt-8 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+        >
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))]">
+            <label className="grid gap-1.5 text-sm font-medium">
+              Keyword or reference number
+              <input
+                name="q"
+                defaultValue={search.q}
+                placeholder="Search title, description, agency..."
+                className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 font-normal outline-none focus:border-[var(--accent)]"
+              />
+            </label>
+            <FilterSelect
+              label="Agency"
+              name="agency"
+              defaultValue={search.agency}
+              allLabel="All agencies"
+              options={agencies.map((item) => item.agencyNameArabic)}
+            />
+            <FilterSelect
+              label="Activity"
+              name="activity"
+              defaultValue={search.activity}
+              allLabel="All activities"
+              options={activities.flatMap((item) =>
+                item.activityNameArabic ? [item.activityNameArabic] : [],
+              )}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <FilterSelect
+              label="Execution region"
+              name="region"
+              defaultValue={search.region}
+              allLabel="All enriched regions"
+              options={regions.flatMap((item) =>
+                item.executionRegionArabic ? [item.executionRegionArabic] : [],
+              )}
+            />
+            <FilterSelect
+              label="Status"
+              name="status"
+              defaultValue={search.status}
+              allLabel="All statuses"
+              options={statuses.flatMap((item) =>
+                item.tenderStatusNameArabic ? [item.tenderStatusNameArabic] : [],
+              )}
+            />
+            <label className="grid gap-1.5 text-sm font-medium">
+              Submission deadline
+              <select
+                name="deadline"
+                defaultValue={search.deadline}
+                className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 font-normal outline-none focus:border-[var(--accent)]"
+              >
+                <option value="any">Any deadline</option>
+                <option value="7">Closing within 7 days</option>
+                <option value="30">Closing within 30 days</option>
+                <option value="missing">Deadline not provided</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium">
+              Sort results
+              <select
+                name="sort"
+                defaultValue={search.sort}
+                className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 font-normal outline-none focus:border-[var(--accent)]"
+              >
+                <option value="published-desc">Newest published</option>
+                <option value="deadline-asc">Deadline: soonest first</option>
+                <option value="deadline-desc">Deadline: latest first</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+            >
+              Apply search and filters
+            </button>
+            {hasFilters && (
+              <Link
+                href="/tenders"
+                className="px-2 py-2.5 text-sm font-semibold text-[var(--muted)] hover:text-[var(--accent)]"
+              >
+                Clear all
+              </Link>
+            )}
+          </div>
+        </form>
+
         <section className="pt-8">
           <div className="mb-5 flex items-end justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold tracking-tight">
-                Recently published
+                {hasFilters ? "Matching tenders" : "Recently published"}
               </h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Showing up to 120 tenders stored in your local database.
+                {resultCount} {resultCount === 1 ? "result" : "results"} · Page{" "}
+                {search.page} of {totalPages}
               </p>
             </div>
           </div>
 
           {tenders.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-6 py-16 text-center">
-              <h2 className="text-xl font-semibold">No tenders imported yet</h2>
+              <h2 className="text-xl font-semibold">No matching tenders</h2>
               <p className="mt-2 text-[var(--muted)]">
-                Start the database, then run{" "}
-                <code className="rounded bg-[var(--accent-soft)] px-2 py-1 text-sm text-[var(--accent)]">
-                  npm run etimad:import
-                </code>
-                .
+                Try removing a filter or using a broader keyword.
               </p>
             </div>
           ) : (
@@ -129,6 +343,21 @@ export default async function TendersPage() {
                         {tender.activityNameArabic && (
                           <span className="rounded-full bg-[var(--background)] px-2.5 py-1 text-[var(--muted)]">
                             {tender.activityNameArabic}
+                          </span>
+                        )}
+                        {tender.executionRegionArabic && (
+                          <span className="rounded-full bg-[var(--background)] px-2.5 py-1 text-[var(--muted)]">
+                            {tender.executionRegionArabic}
+                          </span>
+                        )}
+                        {tender.tenderStatusNameArabic && (
+                          <span className="rounded-full bg-[var(--background)] px-2.5 py-1 text-[var(--muted)]">
+                            {tender.tenderStatusNameArabic}
+                          </span>
+                        )}
+                        {tender.detailEnrichmentStatus === "complete" && (
+                          <span className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 text-[var(--accent)]">
+                            Details enriched
                           </span>
                         )}
                         <span className="text-[var(--muted)]">
@@ -182,11 +411,55 @@ export default async function TendersPage() {
                       >
                         View original on Etimad ↗
                       </a>
+                      <Link
+                        href={`/tenders/${tender.id}`}
+                        className="mt-3 block font-semibold text-[var(--foreground)] hover:text-[var(--accent)]"
+                      >
+                        Open internal details →
+                      </Link>
+                      <div className="mt-4">
+                        <DecisionControls
+                          tenderId={tender.id}
+                          status={tender.decision?.status ?? null}
+                          compact
+                        />
+                      </div>
                     </div>
                   </div>
                 </article>
               ))}
             </div>
+          )}
+
+          {totalPages > 1 && (
+            <nav
+              aria-label="Tender result pages"
+              className="mt-8 flex items-center justify-between gap-4"
+            >
+              {search.page > 1 ? (
+                <Link
+                  href={buildPageHref(search, search.page - 1)}
+                  className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold hover:border-[var(--accent)]"
+                >
+                  ← Previous
+                </Link>
+              ) : (
+                <span />
+              )}
+              <span className="text-sm text-[var(--muted)]">
+                Page {search.page} of {totalPages}
+              </span>
+              {search.page < totalPages ? (
+                <Link
+                  href={buildPageHref(search, search.page + 1)}
+                  className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold hover:border-[var(--accent)]"
+                >
+                  Next →
+                </Link>
+              ) : (
+                <span />
+              )}
+            </nav>
           )}
         </section>
       </div>

@@ -49,6 +49,16 @@ npm run etimad:import
 Running the import again updates the existing tenders instead of creating
 duplicates.
 
+Manually enrich the next unenriched tender, or provide a reference number:
+
+```bash
+npm run etimad:enrich
+npm run etimad:enrich -- 260639003513
+```
+
+Detail enrichment stores normalized public fields, raw HTML snapshots, and
+public attachment metadata without downloading attachment files.
+
 The current local Prisma Postgres server has been reliable for schema push and
 application development, but unreliable for Prisma migration-management
 commands. The version-controlled migrations will be applied and tested against
@@ -70,6 +80,18 @@ Open `http://localhost:3000`.
 
 The homepage redirects to `/tenders`, which displays up to 120 real tenders
 stored in the local database.
+
+The tender browser supports server-side keyword search, agency/activity/region/
+status filters, deadline windows, sorting, and pagination. Search state is
+stored in URL query parameters so filtered views can be refreshed or shared.
+
+Tender cards and detail pages support reversible saved/ignored decisions.
+Ignored tenders are hidden from default browsing and remain accessible at
+`/tenders/saved?view=ignored`. Tender notes are stored locally with decisions.
+
+Create or edit the local company profile at `/company`. Profile list fields
+accept comma-separated or one-item-per-line values and will power explainable
+tender matching in the next milestone.
 
 ## Useful Checks
 

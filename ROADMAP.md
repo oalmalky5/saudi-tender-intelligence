@@ -369,6 +369,8 @@ Allow users to inspect the publicly available details of a tender.
 You can enrich and open one tender to inspect all publicly available details
 stored in your own database.
 
+Status: Complete on 2026-06-12.
+
 ---
 
 ## Milestone 3 — Search and Filters
@@ -389,6 +391,17 @@ Filters for:
 - deadline
 - closing soon
 
+Future discovery navigation should organize tender browsing into focused views:
+
+- Discover: all tenders with deterministic filters and sorting
+- Recommended: company-profile relevance ranking
+- Closing Soon: deadline-prioritized opportunities
+- Saved: manually selected tenders
+
+The Recommended view should be introduced after company-profile matching
+exists. AI-enhanced relevance ranking should improve that view later rather
+than replace deterministic filters.
+
 ### Learn only what is needed
 
 - query params
@@ -400,6 +413,8 @@ Filters for:
 ### Done when
 
 You can search and filter tenders better than a basic table.
+
+Status: Complete on 2026-06-12.
 
 ---
 
@@ -427,6 +442,8 @@ Let users manage tender decisions.
 ### Done when
 
 The app remembers which tenders matter to the user.
+
+Status: Complete on 2026-06-12.
 
 ---
 
@@ -461,6 +478,8 @@ Company profile fields:
 ### Done when
 
 You can create and edit a company profile.
+
+Status: Complete on 2026-06-12.
 
 ---
 
@@ -768,6 +787,43 @@ The report should include:
 ### Done when
 
 The app can generate a useful weekly tender report from the database.
+
+---
+
+## Milestone 14 — Product Styling and Experience Refinement
+
+### Goal
+
+Turn the proven workflows into a cohesive, polished portfolio and client-facing
+product experience.
+
+### Build
+
+- consistent application navigation
+- focused views: Discover, Recommended, Closing Soon, and Saved
+- refined information hierarchy and tender cards
+- cohesive spacing, typography, colors, and component states
+- responsive desktop and mobile layouts
+- loading, empty, error, success, and disabled states
+- accessibility review
+- visual treatment for match scores, confidence, risks, and recommendations
+- portfolio-ready dashboard and demo flow
+
+This milestone should improve presentation without changing the underlying
+matching, AI, or ingestion behavior.
+
+### Learn only what is needed
+
+- reusable design-system components
+- responsive layouts
+- accessibility basics
+- interaction and state design
+- visual regression testing if useful
+
+### Done when
+
+The main workflows feel consistent, intentional, and polished enough for a
+portfolio demonstration and early client feedback.
 
 ---
 
@@ -1181,6 +1237,8 @@ The final product experience should be:
 5. User can also run manual searches and matching.
 6. AI ranks and explains matches using available tender information.
 7. User gets a clear weekly action report.
+8. User navigates focused Discover, Recommended, Closing Soon, and Saved
+   experiences through a cohesive, polished interface.
 
 The long-term product is:
 
