@@ -802,3 +802,29 @@ Tender text prefers selected language when stored, otherwise uses Arabic source
 
 Plan Milestone 9 AI tender matching and define how it improves semantic and
 bilingual understanding without replacing deterministic scoring.
+
+## Milestone 8.5 — English Tender Translation
+
+Milestone 8.5 adds manual, on-demand English translation for the public Arabic
+tender title and description. The original Arabic remains authoritative.
+
+### Design Decisions
+
+- **Manual before automatic:** Translation is triggered per tender while
+  quality and cost are evaluated.
+- **Translate, do not summarize:** A strict structured-output prompt prohibits
+  inference, explanation, omission, and added facts.
+- **Cache by source content:** A SHA-256 hash of the Arabic title and
+  description identifies whether a translation is current, independent of
+  unrelated tender database updates.
+- **Keep history and a current copy:** `TenderTranslation` stores append-only
+  provenance and usage metadata. `Tender.titleEnglish` and
+  `Tender.descriptionEnglish` hold the latest accepted result for fast display
+  and search.
+- **Evaluate before storing:** Deterministic checks reject obvious contract
+  violations. Bilingual human review remains necessary.
+
+### Next Session
+
+Evaluate several representative translations against `TRANSLATION_EVALS.md`,
+then begin Milestone 9 AI tender matching.

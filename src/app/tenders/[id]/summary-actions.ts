@@ -11,11 +11,6 @@ export type SummaryActionState = {
   message: string;
 };
 
-export const initialSummaryActionState: SummaryActionState = {
-  status: "idle",
-  message: "",
-};
-
 function readTenderId(formData: FormData): string {
   const value = formData.get("tenderId");
 

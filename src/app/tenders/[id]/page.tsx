@@ -8,6 +8,11 @@ import { LanguageSwitcher } from "@/app/language-switcher";
 import { dateLocale, pick, type Locale } from "@/lib/i18n/locale";
 import { getLocale } from "@/lib/i18n/locale-server";
 import { localizedTenderText } from "@/lib/i18n/tender-text";
+import {
+  buildTenderTranslationSource,
+  hashTenderTranslationSource,
+} from "@/lib/ai/tender-translation-source";
+import { TenderTranslationPanel } from "./translation-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +80,7 @@ export default async function TenderDetailPage({
         attachments: { orderBy: { nameArabic: "asc" } },
         decision: true,
         aiSummaries: { orderBy: { generatedAt: "desc" }, take: 20 },
+        translations: { orderBy: { generatedAt: "desc" }, take: 20 },
       },
     }),
     prisma.companyProfile.findUnique({
@@ -93,6 +99,9 @@ export default async function TenderDetailPage({
     locale,
     tender.descriptionEnglish,
     tender.descriptionArabic,
+  );
+  const translationSourceHash = hashTenderTranslationSource(
+    buildTenderTranslationSource(tender),
   );
 
   return (
@@ -184,6 +193,13 @@ export default async function TenderDetailPage({
           tenderUpdatedAt={tender.updatedAt}
           currentCompanyProfile={companyProfile}
           summaries={tender.aiSummaries}
+          locale={locale}
+        />
+
+        <TenderTranslationPanel
+          tenderId={tender.id}
+          currentSourceHash={translationSourceHash}
+          translations={tender.translations}
           locale={locale}
         />
 

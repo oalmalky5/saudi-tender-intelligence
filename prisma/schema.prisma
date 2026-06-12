@@ -69,6 +69,7 @@ model Tender {
   attachments    TenderAttachment[]
   decision       TenderDecision?
   aiSummaries    TenderAiSummary[]
+  translations   TenderTranslation[]
 
   @@index([agencyNameArabic])
   @@index([activityNameArabic])
@@ -143,7 +144,7 @@ model CompanyProfile {
 }
 
 model TenderAiSummary {
-  id                            String   @id @default(cuid())
+  id                            String    @id @default(cuid())
   tenderId                      String
   companyProfileId              String?
   content                       Json
@@ -153,14 +154,35 @@ model TenderAiSummary {
   inputTokens                   Int?
   outputTokens                  Int?
   totalTokens                   Int?
-  estimatedCostUsd              Decimal? @db.Decimal(12, 6)
+  estimatedCostUsd              Decimal?  @db.Decimal(12, 6)
   sourceTenderUpdatedAt         DateTime
   sourceCompanyProfileUpdatedAt DateTime?
-  generatedAt                   DateTime @default(now())
+  generatedAt                   DateTime  @default(now())
 
   tender         Tender          @relation(fields: [tenderId], references: [id], onDelete: Cascade)
   companyProfile CompanyProfile? @relation(fields: [companyProfileId], references: [id], onDelete: SetNull)
 
   @@index([tenderId, generatedAt])
   @@index([companyProfileId])
+}
+
+model TenderTranslation {
+  id                 String   @id @default(cuid())
+  tenderId           String
+  titleEnglish       String
+  descriptionEnglish String?  @db.Text
+  sourceHash         String
+  model              String
+  promptVersion      String
+  openaiResponseId   String?
+  inputTokens        Int?
+  outputTokens       Int?
+  totalTokens        Int?
+  estimatedCostUsd   Decimal? @db.Decimal(12, 6)
+  generatedAt        DateTime @default(now())
+
+  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([tenderId, generatedAt])
+  @@index([tenderId, sourceHash])
 }

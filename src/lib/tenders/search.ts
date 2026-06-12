@@ -61,7 +61,9 @@ export function buildTenderWhere(
     conditions.push({
       OR: [
         { titleArabic: { contains: search.q, mode: "insensitive" } },
+        { titleEnglish: { contains: search.q, mode: "insensitive" } },
         { descriptionArabic: { contains: search.q, mode: "insensitive" } },
+        { descriptionEnglish: { contains: search.q, mode: "insensitive" } },
         { agencyNameArabic: { contains: search.q, mode: "insensitive" } },
         { activityNameArabic: { contains: search.q, mode: "insensitive" } },
         { referenceNumber: { contains: search.q, mode: "insensitive" } },

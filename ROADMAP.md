@@ -689,6 +689,35 @@ Stored AI summaries remain English-only by current product decision.
 
 ---
 
+## Milestone 8.5 — English Tender Translation
+
+### Goal
+
+Make public Arabic tender titles and descriptions understandable and searchable
+in English without changing or replacing the Arabic source.
+
+### Build
+
+- manual, on-demand AI translation for a tender
+- faithful translation of title and public description only
+- strict structured output with no summarizing, inference, or added facts
+- append-only translation history with model, prompt, token, and cost metadata
+- source-content hash for accurate staleness detection
+- cached current English fields used by tender lists, details, and search
+- deterministic checks and a human evaluation checklist
+
+Translation stays manual during development so API spend remains intentional.
+Automatic translation of every imported tender should only be considered after
+quality and cost are measured on a representative evaluation set.
+
+### Done when
+
+A user can translate one tender on demand, view the English result, identify a
+stale translation after Arabic source text changes, and inspect its generation
+metadata.
+
+---
+
 ## Milestone 9 — AI Tender Matching
 
 ### Goal
