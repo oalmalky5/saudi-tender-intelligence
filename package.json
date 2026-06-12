@@ -7,16 +7,24 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test",
+    "postinstall": "prisma generate",
     "db:dev": "prisma dev --name etimad-ai",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev"
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "etimad:preview": "tsx scripts/preview-etimad-list.ts",
+    "etimad:import": "tsx scripts/import-etimad-list.ts"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "next": "16.2.9",
+    "pg": "^8.21.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -27,6 +35,7 @@
     "eslint-config-next": "16.2.9",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

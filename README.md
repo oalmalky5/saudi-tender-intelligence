@@ -26,10 +26,38 @@ npm run db:dev
 ```
 
 Copy the connection strings printed by Prisma into `.env`, then validate the
-Prisma schema:
+Prisma schema and synchronize the current local development database:
 
 ```bash
 npm run db:validate
+npm run db:push
+```
+
+Preview and validate one live page of active Etimad tenders without writing to
+the database:
+
+```bash
+npm run etimad:preview
+```
+
+Import that validated page into PostgreSQL using idempotent upserts:
+
+```bash
+npm run etimad:import
+```
+
+Running the import again updates the existing tenders instead of creating
+duplicates.
+
+The current local Prisma Postgres server has been reliable for schema push and
+application development, but unreliable for Prisma migration-management
+commands. The version-controlled migrations will be applied and tested against
+standard PostgreSQL when Docker is introduced.
+
+For a standard PostgreSQL database, apply checked-in migrations with:
+
+```bash
+npx prisma migrate deploy
 ```
 
 Start the web application in another terminal:
@@ -44,8 +72,10 @@ Open `http://localhost:3000`.
 
 ```bash
 npm run lint
+npm test
 npm run build
 npm run db:validate
+npm run db:push
 ```
 
 ## Project Documents
