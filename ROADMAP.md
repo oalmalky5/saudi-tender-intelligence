@@ -759,6 +759,16 @@ into Etimad or reviewing the conditions booklet.
 
 The user can click “Find Relevant Tenders” and receive an AI-ranked shortlist.
 
+Implementation uses one manual paid request over at most 10 candidates.
+Positive deterministic matches are selected first; recent zero-score tenders
+fill remaining slots so AI can recover some semantic and cross-language
+matches. This bounds cost and keeps the rule-based ranking visible for
+comparison. Initial evaluation remains required before the shortlist should
+influence notifications or automatic workflows.
+
+Status: Implementation complete on 2026-06-13. The first live evaluation is
+pending creation of a representative primary company profile.
+
 ---
 
 ## Milestone 10 — Tender Booklet Analysis
@@ -848,6 +858,11 @@ A user can manually upload one booklet, review the estimated cost, generate a
 stored English qualification analysis, and verify every important conclusion
 against cited booklet pages.
 
+Status: Implementation complete on 2026-06-13. Automated verification passed.
+The first representative PDF extraction and paid cited analysis remain pending
+because macOS blocks programmatic access to the fixture while it is in
+`Downloads`; it can be validated by uploading it through the tender detail UI.
+
 ---
 
 ## Milestone 11 — Chat With Tender Database
@@ -882,6 +897,15 @@ User question → retrieve relevant tender records → AI answers using only tho
 
 The AI can answer questions based only on retrieved tender records.
 
+Implementation uses deterministic retrieval over at most 20 local tender
+records followed by one structured paid AI request. Every supported answer must
+cite retrieved tender IDs; empty or insufficient retrieval must produce an
+explicit unsupported answer.
+
+Status: Implementation and initial live evaluation complete on 2026-06-13.
+Continue evaluating keyword, company-fit, comparison, and unsupported
+questions before adding multi-turn conversational memory.
+
 ---
 
 ## Milestone 12 — CSV Import
@@ -911,6 +935,27 @@ Update the database without editing code.
 ### Done when
 
 You can upload a CSV and update the tender database.
+
+### Implementation
+
+- `/admin/import` provides a local-only staged import workflow.
+- Known English and Arabic header aliases are mapped automatically and shown
+  before import.
+- Every row is validated before writing; invalid and duplicate rows remain
+  visible in the preview and are not imported.
+- Valid rows are upserted by tender reference number, so new records are
+  created and existing records are updated.
+- Uploads are limited to 5 MB and 2,000 rows.
+- Import sessions store mapping, preview rows, counts, and completion results
+  for local auditability.
+
+### Current Boundary
+
+The first version automatically maps recognized headers. Manual dropdown
+mapping for unfamiliar column names can be added later if real client CSV
+formats require it.
+
+Status: Implementation and local verification complete on 2026-06-13.
 
 ---
 
@@ -961,6 +1006,43 @@ opportunities appear.
 New and updated tenders can be imported on a schedule, matched against company
 profiles, and surfaced through explainable notifications.
 
+### Implementation
+
+- `npm run monitor:run` executes the same monitoring job that a local cron task
+  or future hosted scheduler can invoke.
+- The job fetches up to five Etimad public visitor pages conservatively,
+  classifies stable business-data changes, and imports the current records.
+- Only a bounded set of new or changed tenders is detail-enriched per run.
+- Deterministic company matching creates explainable notifications without
+  paid AI requests.
+- Notification settings include a relevance threshold, deadline-reminder
+  window, and daily, weekly, or disabled digest frequency.
+- `/notifications` provides manual monitoring, unread states, notification
+  settings, tender links, error alerts, and monitoring-run history.
+- Stable notification keys and stable tender-version fingerprints make repeat
+  runs idempotent.
+
+### Current Boundary
+
+The monitoring command is scheduler-ready, but a recurring cron entry is not
+installed automatically on the development machine. Deployment will determine
+whether cron, a hosted scheduler, or a background-worker service invokes it.
+The local notification center does not yet send email, SMS, or WhatsApp.
+
+### Initial Live Verification
+
+- First run fetched 120 tenders, discovered 6 new and 114 genuinely changed
+  records, and enriched 5 affected tenders without errors.
+- A repeated run initially exposed Etimad's volatile `remainingMins` and
+  `currentDateTime` transport fields. Excluding them from version fingerprints
+  corrected false change detection.
+- Final repeated run fetched the same 120 records and correctly classified all
+  120 as unchanged, with no enrichment work or duplicate notifications.
+
+Status: Local-first implementation and live verification complete on
+2026-06-13. Register the monitoring command with the chosen scheduler when the
+runtime/deployment environment is selected.
+
 ---
 
 ## Milestone 14 — Weekly AI Tender Report
@@ -996,6 +1078,48 @@ The report should include:
 ### Done when
 
 The app can generate a useful weekly tender report from the database.
+
+### Implementation
+
+- `/reports/weekly` provides the primary report-generation and review
+  workspace.
+- Each report uses one bounded paid AI request over at most 20 curated tenders.
+- Candidate curation prioritizes saved opportunities, deterministic relevance,
+  near deadlines, the selected date range, and recency.
+- Structured AI output covers an executive summary, market signals,
+  recommended actions, limitations, and categorized tender reviews.
+- Deterministic checks reject unknown tender IDs and eligibility or
+  winning-probability overclaims before storage.
+- The application renders validated output into Markdown with trusted local
+  tender links.
+- Stored reports include date range, source profile/tender versions, model,
+  prompt version, token usage, and estimated cost.
+- `npm run report:weekly` invokes the same report service as the web button.
+
+### Current Boundary
+
+Reports require a primary company profile because relevance, ignore decisions,
+and recommended actions cannot be meaningfully generated without one. Export
+to PDF or Word is deferred; validated Markdown is stored and visible in the
+report workspace.
+
+### Initial Verification
+
+- The paid live evaluation stopped before making an OpenAI request because no
+  primary company profile currently exists.
+- Create a representative company profile before judging report usefulness and
+  cost.
+
+Status: Implementation and local verification complete on 2026-06-13. Live AI
+report evaluation remains pending a representative company profile.
+
+### Matching Quality Guardrail
+
+Company fit now requires direct evidence that the company itself could
+plausibly deliver the tender's requested scope. Contextual overlap such as a
+target government entity, region, SME preference, public-sector procurement,
+or the ability to help another bidder does not establish fit. Zero credible
+matches is a valid chat, shortlist, notification, and weekly-report outcome.
 
 ---
 
@@ -1033,6 +1157,248 @@ matching, AI, or ingestion behavior.
 
 The main workflows feel consistent, intentional, and polished enough for a
 portfolio demonstration and early client feedback.
+
+### Experience Principle
+
+Every product section must feel responsive and alive rather than behaving like
+a static administrative website. New sections should include:
+
+- clear active and selected states
+- purposeful hover, focus, pressed, loading, success, and error feedback
+- smooth transitions that clarify navigation and state changes
+- layered visual hierarchy instead of undifferentiated white boxes
+- responsive behavior designed for desktop and mobile
+- reduced-motion support for accessibility
+
+Motion should communicate state and continuity. It should never delay work,
+hide information, or exist only as decoration.
+
+### Implementation
+
+- Added a persistent animated application shell shared by every route.
+- Replaced repeated page headers with active-route navigation, mobile top bar,
+  and a compact mobile navigation dock.
+- Introduced a cohesive visual system using layered surfaces, ambient color,
+  stronger hierarchy, modern typography, and depth.
+- Added route transitions, staggered card entrances, hover elevation, active
+  navigation indicators, responsive control feedback, animated details, and
+  loading skeletons.
+- Applied shared interaction behavior across cards, forms, buttons, tables,
+  empty states, tender details, AI workflows, reports, notifications, company
+  profile, and admin tools.
+- Added `prefers-reduced-motion` behavior so animation remains accessible.
+
+### Verification
+
+- Visually reviewed Discover, Chat, Company Profile, Weekly Reports, and mobile
+  navigation using local browser captures.
+- 84 automated tests passed.
+- Lint and the production build passed.
+
+Status: Initial cohesive product-experience redesign complete on 2026-06-13.
+Continue refining individual workflows during real user feedback rather than
+allowing new static sections to diverge from the shared system.
+
+---
+
+## Portfolio Completion Strategy
+
+The immediate goal after Milestone 15 is not to launch Etimad AI as a
+multi-tenant Catalyft product. The goal is to finish a credible, deployed,
+recruiter-ready product that demonstrates:
+
+- full-stack product development
+- ingestion and normalization of imperfect external data
+- explainable deterministic and AI-assisted matching
+- grounded AI summaries, chat, reports, translations, and document analysis
+- evaluation, hallucination controls, and API cost awareness
+- polished user experience and sound engineering judgment
+
+Remaining milestones should strengthen that story. Enterprise SaaS features
+that do not materially improve the portfolio demonstration are explicitly
+deferred.
+
+---
+
+## Milestone 16 — Portfolio Foundation and Repository Quality
+
+### Goal
+
+Make the repository understandable and credible to a technical reviewer before
+they run the application.
+
+### Build
+
+- audit and organize the current working tree
+- remove accidental generated or temporary artifacts from version control
+- ensure secrets and uploaded documents cannot be committed
+- provide a reliable local setup path with documented environment variables
+- add seed/demo data so the main workflows can be evaluated consistently
+- document the architecture, data flow, AI boundaries, and key trade-offs
+- rewrite the README around the problem, solution, screenshots, setup, and
+  technical decisions
+- document known Etimad access limitations and the portfolio-demo boundary
+- confirm lint, tests, migrations, and production build run from a clean clone
+
+### Done when
+
+A recruiter or engineer can understand the product, run it locally, and see
+evidence of thoughtful technical decisions without needing an explanation from
+the author.
+
+### Implementation
+
+- Reframed the README around the problem, complete product workflow, technical
+  highlights, setup path, grounding rules, and deliberate scope decisions.
+- Added `ARCHITECTURE.md` to explain ingestion, deterministic processing, AI
+  contracts, cost controls, trade-offs, and remaining production gaps.
+- Added a non-sensitive demonstration company profile through
+  `npm run demo:seed`; it refuses to overwrite an existing profile unless
+  `--replace` is explicitly supplied.
+- Added one full repository verification command through `npm run check`.
+- Documented every server-side environment variable and confirmed local
+  secrets, generated Prisma code, build output, dependencies, and uploaded
+  documents are ignored.
+- Removed unused starter assets from the public directory.
+
+### Verification
+
+- The demo seed detected the existing Catalyft profile and made no changes.
+- Git hygiene checks confirmed that secrets, generated code, runtime output,
+  dependencies, and uploaded booklets are untracked and ignored.
+- 84 automated tests, lint, Prisma validation, and the production build passed.
+
+Status: Initial implementation complete on 2026-06-14. Repeat the documented
+setup from a clean clone after the next repository commit to close the final
+reproducibility check.
+
+---
+
+## Milestone 17 — Trustworthy AI Evaluation and Demo Scenarios
+
+### Goal
+
+Prove that the AI features are useful, grounded, and capable of returning no
+match when no credible fit exists.
+
+### Build
+
+- create a stable representative demo company profile
+- create a small curated evaluation set for summaries, matching, chat, weekly
+  reports, translations, and booklet analysis
+- include positive matches, weak matches, irrelevant tenders, missing data,
+  misleading contextual overlap, and explicit no-match cases
+- run deterministic checks and record human review results
+- surface citations, limitations, confidence, and missing-information messages
+  clearly in the interface
+- record model, prompt version, token usage, estimated cost, and evaluation
+  outcome for representative runs
+- document the improvements made after failed or misleading outputs
+
+### Current Boundary
+
+This milestone does not require a complex evaluation platform, fine-tuning, or
+continuous automated model grading. A small, well-documented evaluation set
+with reproducible results is more valuable for the portfolio.
+
+### Done when
+
+The project can demonstrate both useful recommendations and honest refusal or
+no-match behavior, with evidence showing how AI quality was evaluated.
+
+---
+
+## Milestone 18 — Simple Authentication and Demo Workspace
+
+### Goal
+
+Make personal company data and saved workflows feel credible in a deployed
+demo without building enterprise account management.
+
+### Build
+
+- sign in and sign out
+- protect company profile, saved tenders, reports, notifications, and admin
+  workflows
+- associate private records with one user-owned company workspace
+- provide a pre-populated read-only or resettable demo account
+- prevent one user from accessing another user's private records
+- add basic session and authorization tests
+
+### Explicitly Deferred
+
+- team invitations
+- multiple roles and permission matrices
+- organization switching
+- SSO, MFA, and enterprise identity providers
+- subscriptions, billing, and usage-based plans
+
+### Done when
+
+A reviewer can access a safe demo workspace, while authenticated users' private
+company data and tender decisions are isolated.
+
+---
+
+## Milestone 19 — Deployment and Reliable Portfolio Demo
+
+### Goal
+
+Publish a stable demo that recruiters can open without local setup.
+
+### Build
+
+- deploy the Next.js application and PostgreSQL database
+- configure production environment variables and migrations
+- deploy a safe, conservative scheduled monitoring demonstration
+- add health checks, structured error logging, and basic uptime monitoring
+- add clear failure states when Etimad or OpenAI is unavailable
+- establish database backup and demo-data reset procedures
+- apply API rate limits and upload-size limits to public demo actions
+- verify the complete desktop and mobile demo journey in production
+
+### Current Boundary
+
+The scheduled monitor only needs to demonstrate the architecture reliably. It
+does not need to provide a commercial availability guarantee or continuously
+mirror all Etimad tenders.
+
+Outbound email, SMS, and WhatsApp delivery are deferred. The in-app
+notification center and scheduler-ready monitoring flow are sufficient for the
+portfolio demonstration.
+
+### Done when
+
+A recruiter can open the deployed application, follow the core workflow, and
+see graceful behavior even when an external service fails.
+
+---
+
+## Milestone 20 — Portfolio Case Study and Final Demo
+
+### Goal
+
+Turn the working product into a concise, memorable demonstration of engineering
+and product ability.
+
+### Build
+
+- create a guided demo journey covering discovery, matching, no-match behavior,
+  summary, chat, monitoring, weekly report, and booklet analysis
+- add representative screenshots or a short product walkthrough video
+- write a case study explaining the problem, constraints, architecture,
+  important decisions, failed approaches, and measured outcomes
+- include an architecture diagram and data-flow explanation
+- publish AI evaluation and cost-control results
+- document known limitations and what would be required for a Catalyft
+  production launch
+- perform final accessibility, responsive-design, security, and repository
+  review
+
+### Done when
+
+The project is deployed, documented, easy to evaluate, and communicates a clear
+story within a few minutes while rewarding deeper technical inspection.
 
 ---
 
@@ -1399,47 +1765,86 @@ Learn only when the milestone requires it.
 - AI synthesis
 - export formats
 
+## Learn during Milestone 15
+
+- reusable product design systems
+- responsive interaction design
+- accessibility and reduced motion
+
+## Learn during Milestones 16–17
+
+- repository and architecture documentation
+- reproducible demo data
+- AI evaluation design
+- hallucination and no-match testing
+- communicating engineering trade-offs
+
+## Learn during Milestones 18–19
+
+- authentication and authorization boundaries
+- production environment configuration
+- deployment, migrations, logs, health checks, and rate limiting
+- operating safely around unreliable external services
+
+## Learn during Milestone 20
+
+- technical case-study writing
+- architecture diagrams
+- product demonstration and portfolio storytelling
+
 ---
 
-# 12. What Not to Build Yet
+# 12. Explicitly Deferred Beyond the Portfolio Release
 
-Do not build these at the beginning:
+Do not build these before the portfolio release:
 
-- payments
-- user teams
-- role permissions
-- full admin dashboard
-- mobile app
-- browser extension
-- complex agent system
-- vector database
-- web scraper
-- PDF generation
-- multi-tenant SaaS infrastructure
+- payments, subscriptions, invoices, or usage billing
+- user teams, invitations, organization switching, or complex role permissions
+- enterprise SSO, MFA, or identity-provider integrations
+- a full customer-support or operations admin dashboard
+- outbound SMS, WhatsApp, or highly configurable notification delivery
+- a native mobile app or browser extension
+- complex agent systems, fine-tuning, or a vector database without measured need
+- browser scraping unless the public-data path stops being viable and the legal
+  and operational implications have been reviewed
+- proposal generation or claims about bid eligibility and likelihood of winning
+- PDF or Word report export unless it directly improves the final demo
+- multi-tenant SaaS infrastructure, microservices, Kubernetes, or
+  high-availability architecture
+- formal compliance programs, audit exports, or enterprise data-retention tools
 
-These can come later.
+These are valid future product investments if Catalyft chooses to launch the
+platform commercially. Omitting them from the portfolio release is a deliberate
+scope decision, not an unfinished prototype.
 
-Focus first on:
+Focus the remaining work on:
 
-> real Etimad import → tender list → filters → company profile → relevance matching → AI summary
+> trustworthy AI → simple demo authentication → reliable deployment → strong
+> documentation and case study
 
 ---
 
-# 13. First Portfolio Demo Target
+# 13. Final Portfolio Demo Target
 
-The first impressive demo should show:
+The final demo should show:
 
-1. Tender dashboard
-2. Filters
-3. Company profile
-4. Match score
-5. Match reasons
-6. Tender detail
-7. AI summary
+1. A polished English-first tender discovery dashboard using real Etimad data.
+2. A company profile and explainable deterministic recommendations.
+3. AI matching that can confidently recommend a tender or return no credible
+   match.
+4. Grounded English summaries, translations, and database chat with citations.
+5. A weekly report and monitoring notifications over new or changed tenders.
+6. On-demand booklet analysis with page citations.
+7. Visible AI limitations, evaluation results, and cost controls.
+8. A deployed demo account and a repository that explains the architecture and
+   decisions.
 
 Demo sentence:
 
-> “This is an English-first tender intelligence prototype for Saudi procurement. It imports real public Etimad tenders, helps companies discover relevant opportunities, and generates AI summaries grounded only in available tender data.”
+> “I built an English-first tender intelligence platform for Saudi public
+> procurement that imports and normalizes real Etimad data, explains company
+> relevance, grounds AI answers in source records, analyzes detailed tender
+> documents with citations, and evaluates recommendation quality and cost.”
 
 ---
 
@@ -1461,6 +1866,7 @@ The long-term product is:
 
 > A self-service AI tender discovery and monitoring assistant for Saudi procurement.
 
-The first build step is:
+The portfolio-release finish line is:
 
-> Manually import real active Etimad tenders and show them from my own database in the browser.
+> A polished deployed demo with trustworthy AI behavior, simple authentication,
+> reproducible evaluation evidence, and a compelling technical case study.

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { localeDirection } from "@/lib/i18n/locale";
 import { getLocale } from "@/lib/i18n/locale-server";
+import { AppShell } from "./app-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,7 +18,9 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} dir={localeDirection(locale)} className="h-full">
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <AppShell locale={locale}>{children}</AppShell>
+      </body>
     </html>
   );
 }

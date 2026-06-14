@@ -7,6 +7,7 @@ import { dateLocale, pick, type Locale } from "@/lib/i18n/locale";
 import { getLocale } from "@/lib/i18n/locale-server";
 import { localizeMatchText } from "@/lib/i18n/match-text";
 import { localizedTenderText } from "@/lib/i18n/tender-text";
+import { AiMatchingPanel } from "./ai-matching-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ function scoreTone(score: number): string {
 
 export default async function RecommendedTendersPage() {
   const locale = await getLocale();
-  const [profile, tenders] = await Promise.all([
+  const [profile, tenders, latestAiRun] = await Promise.all([
     prisma.companyProfile.findUnique({ where: { id: "primary" } }),
     prisma.tender.findMany({
       where: { NOT: { decision: { is: { status: "IGNORED" } } } },
@@ -55,6 +56,27 @@ export default async function RecommendedTendersPage() {
         decision: { select: { status: true } },
       },
     }),
+    prisma.tenderAiMatchRun.findFirst({
+      where: { companyProfileId: "primary" },
+      orderBy: { generatedAt: "desc" },
+      include: {
+        matches: {
+          orderBy: { rank: "asc" },
+          include: {
+            tender: {
+              select: {
+                id: true,
+                referenceNumber: true,
+                titleArabic: true,
+                titleEnglish: true,
+                agencyNameArabic: true,
+                updatedAt: true,
+              },
+            },
+          },
+        },
+      },
+    }),
   ]);
 
   const recommendations = profile
@@ -63,7 +85,7 @@ export default async function RecommendedTendersPage() {
           tender,
           match: scoreTenderMatch(profile, tender),
         }))
-        .filter(({ match }) => match.score > 0)
+        .filter(({ match }) => match.hasDirectScopeMatch)
         .sort(
           (left, right) =>
             right.match.score - left.match.score ||
@@ -139,6 +161,12 @@ export default async function RecommendedTendersPage() {
                 </Link>
               </div>
             </section>
+
+            <AiMatchingPanel
+              locale={locale}
+              profileUpdatedAt={profile.updatedAt}
+              run={latestAiRun}
+            />
 
             {recommendations.length === 0 ? (
               <section className="mt-8 rounded-3xl border border-dashed border-[var(--border-strong)] bg-white px-6 py-16 text-center">

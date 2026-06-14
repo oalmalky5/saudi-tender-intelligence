@@ -13,6 +13,7 @@ import {
   hashTenderTranslationSource,
 } from "@/lib/ai/tender-translation-source";
 import { TenderTranslationPanel } from "./translation-panel";
+import { TenderBookletPanel } from "./booklet-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,13 @@ export default async function TenderDetailPage({
         decision: true,
         aiSummaries: { orderBy: { generatedAt: "desc" }, take: 20 },
         translations: { orderBy: { generatedAt: "desc" }, take: 20 },
+        booklets: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            pages: { orderBy: { pageNumber: "asc" } },
+            analyses: { orderBy: { generatedAt: "desc" }, take: 5 },
+          },
+        },
       },
     }),
     prisma.companyProfile.findUnique({
@@ -200,6 +208,13 @@ export default async function TenderDetailPage({
           tenderId={tender.id}
           currentSourceHash={translationSourceHash}
           translations={tender.translations}
+          locale={locale}
+        />
+
+        <TenderBookletPanel
+          tenderId={tender.id}
+          booklets={tender.booklets}
+          companyProfileUpdatedAt={companyProfile?.updatedAt ?? null}
           locale={locale}
         />
 

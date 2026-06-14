@@ -33,8 +33,10 @@ test("scores and explains a strong deterministic match", () => {
     new Date("2026-06-12T12:00:00.000Z"),
   );
 
-  assert.equal(match.score, 100);
-  assert.equal(match.reasons.length, 6);
+  assert.equal(match.score, 95);
+  assert.equal(match.reasons.length, 7);
+  assert.equal(match.hasDirectScopeMatch, true);
+  assert.equal(match.directScopeScore, 50);
   assert.deepEqual(match.matchedTerms, [
     "innovation",
     "digital transformation",
@@ -49,7 +51,8 @@ test("strongly penalizes excluded terms", () => {
     new Date("2026-06-12T12:00:00.000Z"),
   );
 
-  assert.equal(match.score, 40);
+  assert.equal(match.score, 35);
+  assert.equal(match.hasDirectScopeMatch, false);
   assert.match(match.concerns[0] ?? "", /Excluded terms found/);
 });
 
@@ -60,7 +63,7 @@ test("does not invent a region match for an unenriched tender", () => {
     detailEnrichmentStatus: "pending",
   });
 
-  assert.equal(match.score, 90);
+  assert.equal(match.score, 85);
   assert.ok(match.concerns.includes("Region is unknown until public details are enriched."));
 });
 
@@ -81,5 +84,46 @@ test("deadline urgency cannot create relevance by itself", () => {
   );
 
   assert.equal(match.score, 0);
+  assert.equal(match.hasDirectScopeMatch, false);
   assert.deepEqual(match.reasons, []);
+});
+
+test("short acronyms do not match inside unrelated words", () => {
+  const match = scoreTenderMatch(
+    { ...profile, services: ["CR"], activities: [], preferredKeywords: [] },
+    {
+      ...tender,
+      titleArabic: "PCR kits and micron wrapping material",
+      descriptionArabic: null,
+      activityNameArabic: null,
+    },
+  );
+
+  assert.equal(match.hasDirectScopeMatch, false);
+  assert.equal(match.matchedTerms.includes("CR"), false);
+});
+
+test("contextual overlap alone does not establish company fit", () => {
+  const match = scoreTenderMatch(
+    {
+      ...profile,
+      services: [],
+      activities: [],
+      preferredKeywords: [],
+      industries: ["healthcare"],
+      targetGovernmentEntities: ["Program Medical Cities"],
+      regions: ["Riyadh"],
+    },
+    {
+      ...tender,
+      titleArabic: "Supply and install intensive-care medical equipment",
+      descriptionArabic: "SME preference applies",
+      agencyNameArabic: "Program Medical Cities",
+      activityNameArabic: "healthcare",
+    },
+  );
+
+  assert.ok(match.score > 0);
+  assert.equal(match.directScopeScore, 0);
+  assert.equal(match.hasDirectScopeMatch, false);
 });

@@ -23,6 +23,8 @@ export type MatchTender = {
 
 export type TenderMatch = {
   score: number;
+  directScopeScore: number;
+  hasDirectScopeMatch: boolean;
   reasons: string[];
   concerns: string[];
   matchedTerms: string[];
@@ -41,7 +43,16 @@ function findMatchingTerms(terms: string[], text: string): string[] {
   return unique(
     terms.filter((term) => {
       const normalizedTerm = normalize(term);
-      return normalizedTerm.length >= 2 && normalizedText.includes(normalizedTerm);
+      if (normalizedTerm.length < 2) {
+        return false;
+      }
+      if (/^[a-z0-9]{2,3}$/.test(normalizedTerm)) {
+        const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, "i").test(
+          normalizedText,
+        );
+      }
+      return normalizedText.includes(normalizedTerm);
     }),
   );
 }
@@ -70,6 +81,7 @@ export function scoreTenderMatch(
   const reasons: string[] = [];
   const concerns: string[] = [];
   let score = 0;
+  let directScopeScore = 0;
 
   const searchableText = [
     tender.titleArabic,
@@ -84,18 +96,29 @@ export function scoreTenderMatch(
   const activityMatches = matchesAny(profile.activities, tender.activityNameArabic);
   if (activityMatches.length > 0) {
     score += 30;
+    directScopeScore += 30;
     reasons.push(`Activity matches: ${activityMatches.join(", ")}`);
   }
 
-  const positiveTerms = unique([
+  const directTerms = unique([
     ...profile.preferredKeywords,
     ...profile.services,
+  ]);
+  const directMatchedTerms = findMatchingTerms(directTerms, searchableText);
+  if (directMatchedTerms.length > 0) {
+    const directTermScore = Math.min(30, directMatchedTerms.length * 10);
+    score += directTermScore;
+    directScopeScore += directTermScore;
+    reasons.push(`Matched service/scope terms: ${directMatchedTerms.join(", ")}`);
+  }
+
+  const industryTerms = unique([
     ...profile.industries,
   ]);
-  const matchedTerms = findMatchingTerms(positiveTerms, searchableText);
-  if (matchedTerms.length > 0) {
-    score += Math.min(30, matchedTerms.length * 10);
-    reasons.push(`Matched terms: ${matchedTerms.join(", ")}`);
+  const industryMatches = findMatchingTerms(industryTerms, searchableText);
+  if (industryMatches.length > 0) {
+    score += Math.min(10, industryMatches.length * 5);
+    reasons.push(`Industry context matches: ${industryMatches.join(", ")}`);
   }
 
   const entityMatches = matchesAny(
@@ -157,8 +180,10 @@ export function scoreTenderMatch(
 
   return {
     score: Math.max(0, Math.min(100, score)),
+    directScopeScore,
+    hasDirectScopeMatch: directScopeScore > 0 && excludedMatches.length === 0,
     reasons,
     concerns,
-    matchedTerms,
+    matchedTerms: unique([...directMatchedTerms, ...industryMatches]),
   };
 }

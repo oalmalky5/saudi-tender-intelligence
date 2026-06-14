@@ -1,0 +1,43 @@
+# Weekly Tender Reports
+
+Milestone 14 provides the primary weekly decision-brief workflow.
+
+## Generate from the App
+
+Open:
+
+```text
+http://localhost:3000/reports/weekly
+```
+
+Select a date range of up to 31 days and use **Generate Weekly Tender Report**.
+
+## Generate from the Terminal
+
+```bash
+npm run report:weekly
+```
+
+The command and web button use the same report-generation service.
+
+## Report Pipeline
+
+1. Require the primary company profile.
+2. Curate at most 20 tender candidates using saved state, deterministic
+   relevance, deadlines, report dates, and recency.
+3. Make one bounded `gpt-5-mini` request.
+4. Validate the structured response and reject unknown tender references or
+   eligibility overclaims.
+5. Generate Markdown locally so tender links cannot be invented by the model.
+6. Store the report, source versions, model metadata, token usage, and
+   estimated cost.
+
+## Current Limits
+
+- Reports use stored public data and cannot assess hidden or purchased booklet
+  requirements unless those documents have separately been uploaded and
+  analyzed.
+- A company profile is required.
+- PDF and Word export are deferred.
+- Report quality and cost still need live evaluation using a representative
+  company profile.

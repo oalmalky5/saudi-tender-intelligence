@@ -16,7 +16,7 @@ export function LanguageSwitcher({ locale }: { locale: Locale }) {
     <button
       type="button"
       onClick={switchLanguage}
-      className="rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold hover:border-[var(--accent)]"
+      className="language-switcher"
       aria-label={locale === "en" ? "Switch to Arabic" : "التبديل إلى الإنجليزية"}
     >
       {locale === "en" ? "العربية" : "English"}

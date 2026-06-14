@@ -167,6 +167,30 @@ export default async function TendersPage({
           </div>
           <div className="flex items-center gap-4">
             <Link
+              href="/reports/weekly"
+              className="text-sm font-semibold hover:text-[var(--accent)]"
+            >
+              {pick(locale, "Weekly report", "التقرير الأسبوعي")}
+            </Link>
+            <Link
+              href="/notifications"
+              className="text-sm font-semibold hover:text-[var(--accent)]"
+            >
+              {pick(locale, "Notifications", "التنبيهات")}
+            </Link>
+            <Link
+              href="/chat"
+              className="text-sm font-semibold hover:text-[var(--accent)]"
+            >
+              {pick(locale, "Ask database", "اسأل قاعدة البيانات")}
+            </Link>
+            <Link
+              href="/admin/import"
+              className="text-sm font-semibold hover:text-[var(--accent)]"
+            >
+              {pick(locale, "CSV import", "استيراد CSV")}
+            </Link>
+            <Link
               href="/tenders/recommended"
               className="text-sm font-semibold hover:text-[var(--accent)]"
             >

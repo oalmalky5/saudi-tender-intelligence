@@ -65,11 +65,16 @@ model Tender {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  detailSnapshot TenderDetailSnapshot?
-  attachments    TenderAttachment[]
-  decision       TenderDecision?
-  aiSummaries    TenderAiSummary[]
-  translations   TenderTranslation[]
+  detailSnapshot      TenderDetailSnapshot?
+  attachments         TenderAttachment[]
+  decision            TenderDecision?
+  aiSummaries         TenderAiSummary[]
+  translations        TenderTranslation[]
+  aiMatches           TenderAiMatch[]
+  booklets            TenderBooklet[]
+  chatCitations       TenderChatCitation[]
+  notifications       Notification[]
+  weeklyReportTenders WeeklyTenderReportTender[]
 
   @@index([agencyNameArabic])
   @@index([activityNameArabic])
@@ -126,21 +131,29 @@ model TenderDetailSnapshot {
 }
 
 model CompanyProfile {
-  id                        String   @id
-  companyName               String
-  summary                   String   @db.Text
-  services                  String[] @default([])
-  activities                String[] @default([])
-  industries                String[] @default([])
-  targetGovernmentEntities  String[] @default([])
-  regions                   String[] @default([])
-  preferredKeywords         String[] @default([])
-  excludedKeywords          String[] @default([])
-  preferredOpportunityTypes String[] @default([])
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                             String   @id
+  companyName                    String
+  summary                        String   @db.Text
+  services                       String[] @default([])
+  activities                     String[] @default([])
+  industries                     String[] @default([])
+  targetGovernmentEntities       String[] @default([])
+  regions                        String[] @default([])
+  preferredKeywords              String[] @default([])
+  excludedKeywords               String[] @default([])
+  preferredOpportunityTypes      String[] @default([])
+  notificationRelevanceThreshold Int      @default(40)
+  deadlineReminderDays           Int      @default(7)
+  digestFrequency                String   @default("DAILY")
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
 
-  aiSummaries TenderAiSummary[]
+  aiSummaries     TenderAiSummary[]
+  aiMatchRuns     TenderAiMatchRun[]
+  bookletAnalyses TenderBookletAnalysis[]
+  chatRuns        TenderChatRun[]
+  notifications   Notification[]
+  weeklyReports   WeeklyTenderReport[]
 }
 
 model TenderAiSummary {
@@ -185,4 +198,246 @@ model TenderTranslation {
 
   @@index([tenderId, generatedAt])
   @@index([tenderId, sourceHash])
+}
+
+model TenderAiMatchRun {
+  id                            String   @id @default(cuid())
+  companyProfileId              String
+  model                         String
+  promptVersion                 String
+  openaiResponseId              String?
+  candidateCount                Int
+  inputTokens                   Int?
+  outputTokens                  Int?
+  totalTokens                   Int?
+  estimatedCostUsd              Decimal? @db.Decimal(12, 6)
+  sourceCompanyProfileUpdatedAt DateTime
+  generatedAt                   DateTime @default(now())
+
+  companyProfile CompanyProfile  @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+  matches        TenderAiMatch[]
+
+  @@index([companyProfileId, generatedAt])
+}
+
+model TenderAiMatch {
+  id                    String   @id @default(cuid())
+  runId                 String
+  tenderId              String
+  rank                  Int
+  relevanceScore        Int
+  whyMatches            String[]
+  whyMayNotMatch        String[]
+  whatToCheckNext       String[]
+  recommendedAction     String
+  confidence            String
+  deterministicScore    Int
+  sourceTenderUpdatedAt DateTime
+
+  run    TenderAiMatchRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  tender Tender           @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, tenderId])
+  @@unique([runId, rank])
+  @@index([tenderId])
+}
+
+model TenderBooklet {
+  id                  String    @id @default(cuid())
+  tenderId            String
+  originalName        String
+  storedPath          String
+  mimeType            String
+  sizeBytes           Int
+  sha256              String
+  pageCount           Int
+  extractedCharacters Int
+  extractionStatus    String
+  extractionMethod    String
+  requiresOcr         Boolean   @default(false)
+  extractionError     String?   @db.Text
+  extractedAt         DateTime?
+  createdAt           DateTime  @default(now())
+
+  tender   Tender                  @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  pages    TenderBookletPage[]
+  analyses TenderBookletAnalysis[]
+
+  @@unique([tenderId, sha256])
+  @@index([tenderId, createdAt])
+}
+
+model TenderBookletPage {
+  id             String @id @default(cuid())
+  bookletId      String
+  pageNumber     Int
+  text           String @db.Text
+  characterCount Int
+
+  booklet TenderBooklet @relation(fields: [bookletId], references: [id], onDelete: Cascade)
+
+  @@unique([bookletId, pageNumber])
+}
+
+model TenderBookletAnalysis {
+  id                            String    @id @default(cuid())
+  bookletId                     String
+  companyProfileId              String?
+  content                       Json
+  model                         String
+  promptVersion                 String
+  schemaVersion                 String
+  openaiResponseId              String?
+  inputTokens                   Int?
+  outputTokens                  Int?
+  totalTokens                   Int?
+  estimatedCostUsd              Decimal?  @db.Decimal(12, 6)
+  sourceBookletSha256           String
+  sourceCompanyProfileUpdatedAt DateTime?
+  analyzedPageNumbers           Int[]
+  generatedAt                   DateTime  @default(now())
+
+  booklet        TenderBooklet   @relation(fields: [bookletId], references: [id], onDelete: Cascade)
+  companyProfile CompanyProfile? @relation(fields: [companyProfileId], references: [id], onDelete: SetNull)
+
+  @@index([bookletId, generatedAt])
+  @@index([companyProfileId])
+}
+
+model TenderChatRun {
+  id                            String    @id @default(cuid())
+  question                      String    @db.Text
+  content                       Json
+  retrieval                     Json
+  companyProfileId              String?
+  model                         String
+  promptVersion                 String
+  openaiResponseId              String?
+  retrievedTenderCount          Int
+  inputTokens                   Int?
+  outputTokens                  Int?
+  totalTokens                   Int?
+  estimatedCostUsd              Decimal?  @db.Decimal(12, 6)
+  sourceCompanyProfileUpdatedAt DateTime?
+  generatedAt                   DateTime  @default(now())
+
+  companyProfile CompanyProfile?      @relation(fields: [companyProfileId], references: [id], onDelete: SetNull)
+  citations      TenderChatCitation[]
+
+  @@index([generatedAt])
+  @@index([companyProfileId])
+}
+
+model TenderChatCitation {
+  id       String @id @default(cuid())
+  runId    String
+  tenderId String
+  claim    String @db.Text
+
+  run    TenderChatRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  tender Tender        @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([tenderId])
+}
+
+model CsvImportSession {
+  id            String    @id @default(cuid())
+  originalName  String
+  status        String
+  headerMapping Json
+  rows          Json
+  totalRows     Int
+  validRows     Int
+  invalidRows   Int
+  duplicateRows Int
+  createdCount  Int?
+  updatedCount  Int?
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([createdAt])
+}
+
+model MonitoringRun {
+  id                   String    @id @default(cuid())
+  status               String
+  pagesFetched         Int       @default(0)
+  recordsFetched       Int       @default(0)
+  newTenderCount       Int       @default(0)
+  changedTenderCount   Int       @default(0)
+  unchangedTenderCount Int       @default(0)
+  enrichedCount        Int       @default(0)
+  enrichmentErrorCount Int       @default(0)
+  notificationCount    Int       @default(0)
+  errorMessage         String?   @db.Text
+  startedAt            DateTime  @default(now())
+  completedAt          DateTime?
+
+  notifications Notification[]
+
+  @@index([startedAt])
+  @@index([status])
+}
+
+model Notification {
+  id               String    @id @default(cuid())
+  uniqueKey        String    @unique
+  companyProfileId String
+  tenderId         String?
+  monitoringRunId  String?
+  type             String
+  title            String
+  body             String    @db.Text
+  relevanceScore   Int?
+  reasons          String[]  @default([])
+  readAt           DateTime?
+  createdAt        DateTime  @default(now())
+
+  companyProfile CompanyProfile @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+  tender         Tender?        @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  monitoringRun  MonitoringRun? @relation(fields: [monitoringRunId], references: [id], onDelete: SetNull)
+
+  @@index([companyProfileId, createdAt])
+  @@index([companyProfileId, readAt])
+  @@index([tenderId])
+}
+
+model WeeklyTenderReport {
+  id                            String   @id @default(cuid())
+  companyProfileId              String
+  dateFrom                      DateTime
+  dateTo                        DateTime
+  content                       Json
+  markdown                      String   @db.Text
+  model                         String
+  promptVersion                 String
+  openaiResponseId              String?
+  candidateCount                Int
+  inputTokens                   Int?
+  outputTokens                  Int?
+  totalTokens                   Int?
+  estimatedCostUsd              Decimal? @db.Decimal(12, 6)
+  sourceCompanyProfileUpdatedAt DateTime
+  generatedAt                   DateTime @default(now())
+
+  companyProfile CompanyProfile             @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+  tenders        WeeklyTenderReportTender[]
+
+  @@index([companyProfileId, generatedAt])
+  @@index([dateFrom, dateTo])
+}
+
+model WeeklyTenderReportTender {
+  id                    String   @id @default(cuid())
+  reportId              String
+  tenderId              String
+  categories            String[]
+  sourceTenderUpdatedAt DateTime
+
+  report WeeklyTenderReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  tender Tender             @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, tenderId])
+  @@index([tenderId])
 }

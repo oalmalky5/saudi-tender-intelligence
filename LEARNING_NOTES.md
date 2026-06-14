@@ -828,3 +828,354 @@ tender title and description. The original Arabic remains authoritative.
 
 Evaluate several representative translations against `TRANSLATION_EVALS.md`,
 then begin Milestone 9 AI tender matching.
+
+## Milestone 9 — AI Tender Matching
+
+Milestone 9 adds a semantic ranking layer after deterministic matching.
+
+### Flow
+
+```text
+Latest 120 non-ignored tenders
+    ↓ deterministic scoring
+Positive candidates, then recent exploration candidates, capped at 10
+    ↓ one structured OpenAI request
+Validated and stored AI-ranked shortlist
+```
+
+### Design Decisions
+
+- **AI is a bounded reranker:** Rule-based matches come first. Recent zero-score
+  tenders fill unused slots so AI can recover some semantic and cross-language
+  matches, but it still does not scan the full database.
+- **One bounded request:** A manual run sends at most 10 candidates, making cost
+  measurable and avoiding one API request per tender.
+- **Relevance is not eligibility:** Scores and actions describe company fit
+  using public data. They never confirm bidding eligibility or likely success.
+- **Append-only runs:** Each run stores model, prompt, usage, cost, candidate
+  count, profile version, tender versions, and ranked outputs.
+- **Staleness is visible:** A run becomes stale when the company profile or one
+  of its reviewed tenders changes.
+- **Evaluation before automation:** Deterministic checks catch repeatable
+  contract violations; human review judges whether semantic ranking is useful.
+
+### Initial Verification
+
+- 41 automated tests passed.
+- Lint, Prisma validation, database sync, and the production build passed.
+- The first live evaluation stopped before making a paid request because no
+  primary company profile exists yet.
+
+### Next Session
+
+Create a representative company profile, run one live AI shortlist evaluation,
+and review ranking quality against `AI_MATCH_EVALS.md`.
+
+## Milestone 10 — Tender Booklet Analysis
+
+Milestone 10 adds a selective, cited qualification-review workflow for
+conditions booklets obtained through authorized Etimad access.
+
+### Flow
+
+```text
+Manual PDF upload
+    ↓ local SHA-256 hashing and page extraction
+OCR-needed detection and page preview
+    ↓ user reviews estimated cost
+Explicit AI analysis
+    ↓ exact-excerpt citation validation
+Stored English qualification review
+```
+
+### Design Decisions
+
+- **Files stay local:** Original PDFs are stored under ignored
+  `storage/booklets/` paths, not inside PostgreSQL or Git.
+- **Validate content, not names:** Uploads must have a PDF file signature and
+  stay below the 25 MB local limit.
+- **Deduplicate by content:** A SHA-256 hash prevents repeated extraction and
+  analysis of unchanged booklets.
+- **Extract before AI:** Page text, page counts, sparse-text detection, preview,
+  retrieval, and cost estimates run locally.
+- **Bounded retrieval:** Analysis sends at most 30 pages and 100,000 characters,
+  prioritizing first pages and requirement-related keywords.
+- **Citations are executable checks:** Every finding requires page citations
+  with exact source excerpts; unverified excerpts reject the analysis.
+- **Analysis is cached:** The same booklet, prompt, schema, and company profile
+  are not analyzed twice.
+
+### Initial Verification
+
+- 53 automated tests passed before final build verification.
+- The representative PDF could not be read directly from macOS `Downloads`
+  because of operating-system privacy controls.
+- Upload the PDF through a tender detail page to complete extraction and paid
+  analysis evaluation against `BOOKLET_EVALS.md`.
+
+## Milestone 11 — Chat With Tender Database
+
+Milestone 11 adds grounded question answering over locally stored tender
+records.
+
+### Flow
+
+```text
+User question
+    ↓ deterministic retrieval plan
+At most 20 local tender records
+    ↓ one structured OpenAI request
+Citation and refusal validation
+    ↓
+Stored answer with linked tender citations and cost metadata
+```
+
+### Design Decisions
+
+- **Retrieval comes before AI:** Deadline, reference-number, keyword, and
+  company-fit questions use explicit database queries or deterministic scoring.
+- **Bounded context:** Each question supplies at most 20 tender records.
+- **Citations use internal tender IDs:** Supported answers must cite only
+  retrieved records, which the UI links back to tender detail pages.
+- **Unsupported is a valid answer:** Empty retrieval or unavailable hidden
+  information must be acknowledged rather than invented.
+- **Single-question runs first:** This milestone stores independent questions
+  and answers; multi-turn conversational memory is deliberately deferred.
+
+### Initial Live Evaluation
+
+The first closing-this-week answer exposed internal database IDs and omitted
+the retrieval-cap limitation. Prompt `tender-chat-v2` corrected both issues,
+passed deterministic checks, retrieved 20 tenders, and cost approximately
+`$0.0072515`.
+
+## Milestone 12 — CSV Import
+
+Milestone 12 adds a staged local admin workflow at `/admin/import` for updating
+the tender database from CSV files without editing code.
+
+### Flow
+
+```text
+CSV upload
+    ↓ automatic known-header mapping
+Row validation and duplicate detection
+    ↓ stored preview session
+Explicit import confirmation
+    ↓ upsert by reference number
+Created/updated result summary
+```
+
+### Design Decisions
+
+- **Preview before writes:** Uploading a file creates a stored preview but does
+  not modify tenders until the user confirms.
+- **Structured parsing:** `csv-parse` handles quoting, commas, and CSV syntax
+  instead of custom string splitting.
+- **Validate every row:** Zod checks required fields, lengths, dates, and URLs.
+  Invalid rows remain visible and are skipped.
+- **Reference numbers identify tenders:** Valid rows are upserted using the
+  unique tender reference number.
+- **Duplicates are explicit:** A repeated reference within one CSV is marked as
+  a duplicate and skipped.
+- **Source identity remains stable:** CSV-created tenders receive a
+  deterministic source ID, while updates preserve an existing tender's source
+  identity and first-seen timestamp.
+- **Imports are bounded:** Files are limited to 5 MB and 2,000 rows.
+- **Automatic mapping first:** Recognized English and Arabic aliases are
+  displayed in the preview. Manual field mapping is deferred until real files
+  demonstrate the need.
+
+### Verification
+
+- 71 automated tests passed.
+- Lint, Prisma validation, database sync, and the production build passed.
+
+## Milestone 13 — Automated Monitoring and Notifications
+
+Milestone 13 adds a scheduler-ready, idempotent monitoring loop and an in-app
+notification center.
+
+### Flow
+
+```text
+Scheduled or manual monitoring command
+    ↓ conservative Etimad public-list fetch
+Stable change detection
+    ↓ import and bounded detail enrichment
+Deterministic company matching
+    ↓ threshold and deadline rules
+Idempotent in-app notifications and run log
+```
+
+### Design Decisions
+
+- **No paid AI in routine scans:** Notifications use the explainable
+  deterministic score. Paid AI remains an explicit user action.
+- **Stable change detection:** Raw source payloads contain volatile Etimad
+  countdown and request-time fields. Version fingerprints exclude those fields
+  so unchanged tenders do not trigger repeated work.
+- **Bounded external requests:** A run fetches at most five list pages and
+  enriches at most five affected tenders.
+- **Idempotent notifications:** Stable unique keys prevent repeated runs from
+  creating duplicate match, deadline, or digest notifications.
+- **Failures are data:** Monitoring runs store status, counts, and errors.
+  Enrichment failures create visible warnings while preserving imported list
+  data.
+- **Scheduler-ready, not secretly scheduled:** `npm run monitor:run` can be
+  called by cron or a hosted scheduler. No recurring task is installed until
+  the intended runtime and frequency are chosen.
+
+### Live Verification
+
+The first live run fetched 120 records, found 6 new and 114 changed tenders,
+and enriched 5 without errors. A repeated run exposed volatile Etimad fields
+that falsely marked every record as changed. After excluding those fields, the
+final run correctly classified all 120 records as unchanged and performed no
+unnecessary enrichment or notification work.
+
+- 77 automated tests passed.
+- Lint, Prisma validation, database sync, and the production build passed.
+
+## Milestone 14 — Weekly AI Tender Report
+
+Milestone 14 combines retrieval, matching, structured AI output, validation,
+and Markdown rendering into the main weekly decision workflow.
+
+### Flow
+
+```text
+Company profile and selected date range
+    ↓ bounded candidate curation
+At most 20 stored public tenders
+    ↓ one paid structured AI request
+Tender-ID and overclaim validation
+    ↓ local Markdown rendering
+Stored weekly decision brief with trusted tender links
+```
+
+### Design Decisions
+
+- **One request per report:** The report does not call AI once per tender.
+- **Curate before AI:** Saved tenders, deterministic relevance, deadlines,
+  report-period publication, and recency determine the bounded candidate set.
+- **Structured output before Markdown:** AI returns a validated report
+  contract. The application creates Markdown and tender links locally.
+- **Grounded tender reviews:** Every reviewed tender must use an ID from the
+  supplied candidate set.
+- **No eligibility overclaims:** Deterministic checks reject reports that claim
+  eligibility, qualification, or winning probability.
+- **Reports are reproducible:** Stored metadata includes date range, source
+  profile/tender versions, model, prompt version, tokens, and estimated cost.
+- **Profile required:** The app refuses to spend money when no company profile
+  exists because relevance and recommendations would lack a meaningful basis.
+
+### Initial Verification
+
+The first paid evaluation attempt stopped before making an OpenAI request
+because the local database does not currently contain a primary company
+profile. Create a representative profile before evaluating report usefulness
+and cost.
+
+- 81 automated tests passed.
+- Lint, Prisma validation, database sync, and the production build passed.
+
+## Matching Quality Correction — Direct Scope or No Match
+
+A live Catalyft company-fit chat exposed a critical false-positive pattern. The
+assistant recommended maintenance, construction, sewage, and equipment
+tenders because Catalyft could theoretically help another bidder with Etimad
+registration or tender readiness.
+
+That is not company fit. The tender's requested deliverable must itself match
+work the company could plausibly perform.
+
+### Corrections
+
+- Added a distinct direct-scope score and `hasDirectScopeMatch` decision.
+- Context signals such as entity, industry, geography, and deadlines can
+  influence ranking but cannot establish fit alone.
+- Company-fit chat retrieval excludes tenders without direct-scope evidence.
+- Notifications and recommended-tender views require direct-scope evidence.
+- AI chat, shortlist, and weekly-report prompts explicitly forbid using
+  indirect bidder support as fit justification.
+- Weekly reports may contain zero tender reviews.
+- Fixed short acronyms such as `CR` matching inside unrelated words such as
+  `PCR` and `MICRON`.
+
+### Live Regression Result
+
+The corrected Catalyft retrieval scanned the latest 120 non-ignored tenders
+and found zero credible direct-scope matches. The live AI response returned an
+explicit no-match answer with no citations, passed deterministic checks, and
+cost approximately `$0.00093475`.
+
+## Milestone 15 — Cohesive Product Experience
+
+Milestone 15 replaces the collection of static-looking pages with a shared
+product experience.
+
+### Design System Decisions
+
+- **One persistent shell:** Every workflow now shares active navigation,
+  product identity, language switching, and mobile navigation.
+- **Motion communicates continuity:** Routes enter smoothly, cards reveal in
+  sequence, active navigation is visible, and interactions respond immediately.
+- **Depth creates hierarchy:** Layered translucent surfaces, shadows, borders,
+  ambient color, and typography distinguish primary work from supporting data.
+- **Every state matters:** Inputs, buttons, tables, details, empty states,
+  loading, selection, hover, focus, and pressed states all provide feedback.
+- **Mobile is a distinct experience:** Mobile receives a compact top bar and
+  bottom navigation dock instead of a compressed desktop sidebar.
+- **Accessibility overrides spectacle:** Reduced-motion preferences disable
+  nonessential animation, and keyboard focus remains clearly visible.
+
+### Rule for Future Work
+
+Do not add a new page as static text and white boxes. Every new section should
+inherit the shared shell and intentionally design its hierarchy, interaction
+feedback, motion, responsive behavior, empty state, and loading state.
+
+### Verification
+
+- Visually reviewed Discover, Chat, Company Profile, Weekly Reports, and mobile
+  navigation using local browser captures.
+- 84 automated tests passed.
+- Lint and the production build passed.
+
+## Milestone 16 — Portfolio Foundation and Repository Quality
+
+Milestone 16 changes the repository from a development workspace into something
+a technical reviewer can understand and evaluate.
+
+### Main Lesson
+
+A strong product can still look unfinished when its repository only explains
+how it was assembled. Portfolio documentation should explain the problem,
+system behavior, important constraints, engineering decisions, and evidence of
+quality before listing every command.
+
+### Repository Decisions
+
+- **README as the front door:** The README now explains why the product exists,
+  what it demonstrates, how the workflow fits together, and how to run it.
+- **Architecture as evidence:** `ARCHITECTURE.md` records the deterministic
+  before AI design, grounding contract, cost controls, and deliberate
+  trade-offs.
+- **Reproducible but non-destructive demo data:** `npm run demo:seed` provides a
+  useful non-sensitive company profile but refuses to overwrite an existing
+  profile without an explicit `--replace` flag.
+- **One verification command:** `npm run check` makes the expected quality gate
+  visible to reviewers and future contributors.
+- **Repository hygiene is part of security:** Local secrets, generated Prisma
+  code, dependencies, build output, runtime storage, and uploaded booklets stay
+  outside version control.
+- **Deferred features should be explicit:** Clearly explaining why enterprise
+  features are omitted demonstrates scope judgment rather than leaving the
+  product looking accidentally incomplete.
+
+### Verification
+
+- The safe demo seed detected the existing Catalyft profile and preserved it.
+- Git ignore checks confirmed sensitive and generated paths remain untracked.
+- 84 automated tests, lint, Prisma validation, and the production build passed.

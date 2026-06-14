@@ -1,139 +1,228 @@
 # Etimad Tender Intelligence
 
-An English-first tender discovery and monitoring platform for Saudi government
-procurement.
+An English-first tender intelligence platform for Saudi government
+procurement. It imports real public Etimad tenders, makes them easier to
+discover, explains company relevance, and uses grounded AI for summaries,
+translation, document analysis, database chat, and weekly decision reports.
 
-## Foundation Stack
+This repository is currently a local-first portfolio product. It demonstrates
+the complete workflow and the engineering decisions behind it; it is not an
+official Etimad integration or a production Catalyft service.
 
-- Next.js App Router
-- React and TypeScript
-- Tailwind CSS
-- Prisma ORM
-- Local Prisma Postgres for development
+## Why It Exists
+
+Etimad publishes valuable procurement opportunities, but discovering relevant
+tenders requires navigating Arabic-first records, scattered public details,
+and detailed conditions booklets. Etimad Tender Intelligence turns that
+workflow into a clearer decision process:
+
+1. Ingest and normalize public Etimad tender data.
+2. Search, filter, save, ignore, and track opportunities.
+3. Describe a company using non-sensitive profile information.
+4. Rank tenders using explainable rules and bounded AI review.
+5. Investigate shortlisted tenders through grounded summaries and cited
+   booklet analysis.
+6. Monitor changes and produce a weekly action report.
+
+## Product Highlights
+
+- Real public Etimad data with idempotent imports and detail enrichment
+- English/Arabic interface with on-demand English tender translation
+- Explainable deterministic matching before paid AI matching
+- Explicit no-match behavior instead of forced recommendations
+- Grounded tender summaries and database chat with source references
+- On-demand Arabic PDF booklet analysis with page citations
+- New/changed tender monitoring and in-app notifications
+- Weekly company-specific tender reports
+- Structured AI outputs, deterministic checks, evaluation logs, and cost
+  tracking
+- Responsive interface with accessible motion and clear loading/empty states
+
+## Architecture At A Glance
+
+```text
+Etimad public data / CSV
+          |
+          v
+ validation + normalization + idempotent upsert
+          |
+          v
+       PostgreSQL
+       /    |    \
+ search  matching  monitoring
+   |        |         |
+   +--------+---------+
+            |
+   bounded grounded AI calls
+ summaries / translation / matching / chat / reports / booklet analysis
+            |
+   validated stored outputs + usage metadata
+```
+
+The application uses deterministic retrieval and scoring before AI. Model
+outputs are structured, validated, stored with source versions, and rejected
+when they violate important grounding rules. See [ARCHITECTURE.md](ARCHITECTURE.md)
+for the full data flow and trade-offs.
+
+## Technology
+
+- Next.js 16 App Router, React 19, and TypeScript
+- PostgreSQL with Prisma ORM
+- Zod validation at external-data and AI-output boundaries
+- Direct OpenAI Responses API calls without an agent framework
+- Local PDF extraction with `pdfjs-dist`
+- Node test runner through `tsx --test`
 
 ## Local Setup
 
-Install dependencies:
+### Prerequisites
+
+- Node.js 20 or newer
+- npm
+- PostgreSQL, or Prisma's local development database
+- An OpenAI API key only for manually triggered AI features
+
+### 1. Install and configure
 
 ```bash
 npm install
+cp .env.example .env
 ```
 
-Start the local database in one terminal:
+Start Prisma's local PostgreSQL development database in a separate terminal:
 
 ```bash
 npm run db:dev
 ```
 
-Copy the connection strings printed by Prisma into `.env`, then validate the
-Prisma schema and synchronize the current local development database:
+Copy the printed connection strings into `.env`, then prepare the database:
 
 ```bash
 npm run db:validate
 npm run db:push
 ```
 
-Preview and validate one live page of active Etimad tenders without writing to
-the database:
+For a standard PostgreSQL environment, use the checked-in migrations:
 
 ```bash
-npm run etimad:preview
+npx prisma migrate deploy
 ```
 
-Import up to five validated pages into PostgreSQL using idempotent upserts:
+### 2. Add demo data
+
+Import a bounded sample of real active tenders:
 
 ```bash
 npm run etimad:import
 ```
 
-Running the import again updates the existing tenders instead of creating
-duplicates.
+Add the non-sensitive demonstration company profile:
 
-Manually enrich the next unenriched tender, or provide a reference number:
+```bash
+npm run demo:seed
+```
+
+The seed command refuses to overwrite an existing primary profile. To
+deliberately replace it:
+
+```bash
+npm run demo:seed -- --replace
+```
+
+Optionally enrich a tender's public details:
 
 ```bash
 npm run etimad:enrich
 npm run etimad:enrich -- 260639003513
 ```
 
-Detail enrichment stores normalized public fields, raw HTML snapshots, and
-public attachment metadata without downloading attachment files.
-
-The current local Prisma Postgres server has been reliable for schema push and
-application development, but unreliable for Prisma migration-management
-commands. The version-controlled migrations will be applied and tested against
-standard PostgreSQL when Docker is introduced.
-
-For a standard PostgreSQL database, apply checked-in migrations with:
-
-```bash
-npx prisma migrate deploy
-```
-
-Start the web application in another terminal:
+### 3. Run the application
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000).
 
-To enable manual AI summaries, add an OpenAI API key to `.env`:
+## AI Configuration And Cost Controls
+
+Add the API key only when testing AI features:
 
 ```bash
 OPENAI_API_KEY="your-api-key"
-OPENAI_SUMMARY_MODEL="gpt-5-mini"
 ```
 
-The API key stays server-side. Summary generation is manual and never runs
-during tender import or enrichment. Each successful generation stores its
-structured output, model, prompt version, source timestamps, token usage, and
-estimated cost. API usage is billed separately from ChatGPT or Codex.
+The key remains server-side and must never use a `NEXT_PUBLIC_` prefix. Every
+paid feature is manually triggered during development, uses a bounded context,
+logs token usage and estimated cost, and stores validated output.
 
-The homepage redirects to `/tenders`, which displays up to 120 real tenders
-stored in the local database.
+Model overrides are documented in [.env.example](.env.example). Without
+overrides, the application uses its configured mini-model defaults.
 
-The tender browser supports server-side keyword search, agency/activity/region/
-status filters, deadline windows, sorting, and pagination. Search state is
-stored in URL query parameters so filtered views can be refreshed or shared.
+## Main Workflows
 
-Tender cards and detail pages support reversible saved/ignored decisions.
-Ignored tenders are hidden from default browsing and remain accessible at
-`/tenders/saved?view=ignored`. Tender notes are stored locally with decisions.
+| Workflow | Route or command |
+| --- | --- |
+| Discover and filter tenders | `/tenders` |
+| Create the company profile | `/company` |
+| Review deterministic and AI matches | `/tenders/recommended` |
+| Ask grounded database questions | `/chat` |
+| Review notifications and run monitoring | `/notifications` |
+| Generate a weekly decision brief | `/reports/weekly` |
+| Import CSV records | `/admin/import` |
+| Preview Etimad data without writing | `npm run etimad:preview` |
+| Run the monitoring job | `npm run monitor:run` |
 
-Create or edit the local company profile at `/company`. Profile list fields
-accept comma-separated or one-item-per-line values and will power explainable
-tender matching in the next milestone.
+Tender detail pages contain enrichment, decisions, translation, AI summary,
+and booklet upload/analysis workflows.
 
-After creating a company profile, `/tenders/recommended` ranks non-ignored
-tenders with a deterministic relevance score and displays every reason and
-concern behind that score.
+## Verification
 
-Tender detail pages include a manual AI summary panel. Summaries use normalized
-stored data only, are validated before storage, preserve version history, and
-are marked stale after the tender or company profile changes. Review
-`AI_EVALS.md` before evaluating summaries across representative tenders.
+Run the full repository check before committing:
 
-Use the language button in the application header to switch between English
-and Arabic. The selected locale is stored in a browser cookie, changes the
-document between LTR and RTL, localizes dates and interface labels, and prefers
-English tender fields when Etimad provides them. Original Arabic tender data is
-shown as the fallback when no English field exists. AI summaries currently
-remain English-only.
+```bash
+npm run check
+```
 
-## Useful Checks
+Or run checks individually:
 
 ```bash
 npm run lint
 npm test
-npm run build
 npm run db:validate
-npm run db:push
+npm run build
 ```
 
-## Project Documents
+The build requires a reachable database because the current application
+renders database-backed routes during production verification.
 
-- `ROADMAP.md`: product and implementation roadmap
-- `MILESTONE_0_ETIMAD_DATA.md`: Etimad data-access investigation
-- `LEARNING_NOTES.md`: concepts and decisions learned while building
-- `AI_EVALS.md`: manual and deterministic AI-summary evaluation checklist
+## Grounding And Product Boundaries
+
+- Relevance is not eligibility.
+- Public tender data cannot confirm hidden booklet requirements.
+- AI may only use records supplied by the application.
+- Important booklet conclusions require page citations.
+- Zero credible matches is a valid and expected result.
+- Routine monitoring uses deterministic matching and no paid AI calls.
+- Etimad public endpoints are undocumented and treated conservatively.
+- Booklets must be obtained and uploaded through the user's authorized access.
+
+## Repository Guide
+
+- [ARCHITECTURE.md](ARCHITECTURE.md): system design, data flow, AI boundaries,
+  and trade-offs
+- [ROADMAP.md](ROADMAP.md): completed and remaining milestones
+- [MILESTONE_0_ETIMAD_DATA.md](MILESTONE_0_ETIMAD_DATA.md): Etimad data-access
+  investigation
+- [LEARNING_NOTES.md](LEARNING_NOTES.md): concepts and decisions learned while
+  building
+- `*_EVALS.md`: AI evaluation methods and representative run logs
+- [MONITORING.md](MONITORING.md): monitoring behavior and scheduling boundary
+- [WEEKLY_REPORTS.md](WEEKLY_REPORTS.md): weekly-report pipeline and limits
+
+## Deliberately Deferred
+
+The portfolio release does not include payments, organization teams, complex
+permissions, SSO, outbound SMS/WhatsApp, proposal generation, microservices, or
+large-scale infrastructure. These are commercial SaaS concerns that would not
+materially strengthen the current engineering demonstration.
