@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/reliability/logger";
 import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 
+export const dynamic = "force-dynamic";
+
 function authorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   const authorization = request.headers.get("authorization");

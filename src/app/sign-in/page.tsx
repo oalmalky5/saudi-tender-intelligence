@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 
 import { SignInForm } from "./sign-in-form";
 
+export const dynamic = "force-dynamic";
+
 type SignInParams = { next?: string | string[] };
 
 export default async function SignInPage({

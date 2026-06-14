@@ -5,6 +5,8 @@ import { AppShell } from "./app-shell";
 import { getSession } from "@/lib/auth/session";
 import "./globals.css";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Tender Intelligence",
   description: "Discover relevant Saudi government tenders.",
