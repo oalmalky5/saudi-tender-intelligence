@@ -13,6 +13,14 @@ import { LanguageSwitcher } from "@/app/language-switcher";
 import { dateLocale, pick, type Locale } from "@/lib/i18n/locale";
 import { getLocale } from "@/lib/i18n/locale-server";
 import { localizedTenderText } from "@/lib/i18n/tender-text";
+import { getSession } from "@/lib/auth/session";
+import {
+  loadMetadataTranslations,
+  localizedMetadata,
+} from "@/lib/translation/tender-metadata";
+import { refreshTenderDiscovery } from "./actions";
+import { RefreshDiscoveryButton } from "./refresh-discovery-button";
+import { SearchableFilter } from "./searchable-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +62,7 @@ function FilterSelect({
   label: string;
   name: string;
   defaultValue: string;
-  options: string[];
+  options: Array<{ label: string; value: string }>;
   allLabel: string;
 }) {
   return (
@@ -67,8 +75,8 @@ function FilterSelect({
       >
         <option value="">{allLabel}</option>
         {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>
@@ -76,23 +84,34 @@ function FilterSelect({
   );
 }
 
+function first(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
 export default async function TendersPage({
   searchParams,
 }: {
   searchParams: Promise<TenderSearchParams>;
 }) {
-  const search = parseTenderSearchParams(await searchParams);
+  const params = await searchParams;
+  const search = parseTenderSearchParams(params);
+  const session = await getSession();
+  const workspaceId = session?.workspaceId ?? "";
   const locale = await getLocale();
   const searchWhere = buildTenderWhere(search);
   const where = {
     AND: [
       searchWhere,
-      { NOT: { decision: { is: { status: "IGNORED" as const } } } },
+      {
+        decisions: {
+          none: { workspaceId, status: "IGNORED" as const },
+        },
+      },
     ],
   };
   const orderBy = buildTenderOrderBy(search.sort);
 
-  const [tenders, resultCount, agencies, activities, regions, statuses] =
+  const [tenders, resultCount, agencies, activities, regions, statuses, metadataTranslations] =
     await Promise.all([
       prisma.tender.findMany({
         where,
@@ -114,14 +133,18 @@ export default async function TendersPage({
           submissionDeadline: true,
           sourceUrl: true,
           detailEnrichmentStatus: true,
-          decision: { select: { status: true } },
+          decisions: {
+            where: { workspaceId },
+            take: 1,
+            select: { status: true },
+          },
         },
       }),
       prisma.tender.count({ where }),
-      prisma.tender.findMany({
-        distinct: ["agencyNameArabic"],
-        orderBy: { agencyNameArabic: "asc" },
-        select: { agencyNameArabic: true },
+      prisma.governmentAgency.findMany({
+        where: { isOldSystem: false },
+        orderBy: { nameArabic: "asc" },
+        select: { nameArabic: true },
       }),
       prisma.tender.findMany({
         where: { activityNameArabic: { not: null } },
@@ -141,6 +164,7 @@ export default async function TendersPage({
         orderBy: { tenderStatusNameArabic: "asc" },
         select: { tenderStatusNameArabic: true },
       }),
+      loadMetadataTranslations(prisma),
     ]);
 
   const totalPages = Math.max(1, Math.ceil(resultCount / TENDERS_PER_PAGE));
@@ -152,6 +176,14 @@ export default async function TendersPage({
     search.status ||
     search.deadline !== "any" ||
     search.sort !== "published-desc";
+  const returnTo = buildPageHref(search, search.page);
+  const refreshResult = first(params.refresh)
+    .split(",")
+    .map((value) => Number(value));
+  const refreshError = first(params.refreshError);
+  const hasRefreshResult =
+    refreshResult.length === 3 &&
+    refreshResult.every((value) => Number.isInteger(value) && value >= 0);
 
   return (
     <main className="min-h-screen">
@@ -159,7 +191,7 @@ export default async function TendersPage({
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
           <div>
             <p className="text-lg font-semibold tracking-tight">
-              Etimad Intelligence
+              Tender Intelligence
             </p>
             <p className="text-sm text-[var(--muted)]">
               {pick(locale, "Saudi public tender discovery", "اكتشاف المنافسات الحكومية السعودية")}
@@ -226,30 +258,66 @@ export default async function TendersPage({
               {pick(locale, "Find the opportunities that matter.", "اعثر على الفرص التي تهمك.")}
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-              {pick(locale, "Search original Arabic tender content and narrow results using fields stored in your own database.", "ابحث في محتوى المنافسات العربي الأصلي وضيّق النتائج باستخدام البيانات المخزنة في قاعدة بياناتك.")}
+              {pick(locale, "Search English or Arabic tender content and narrow results using translated source fields stored in your own database.", "ابحث في محتوى المنافسات العربي أو الإنجليزي وضيّق النتائج باستخدام بيانات المصدر المترجمة والمخزنة في قاعدة بياناتك.")}
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {[
-              [pick(locale, "Results", "النتائج"), resultCount],
-              [pick(locale, "Agencies", "الجهات"), agencies.length],
-              [pick(locale, "Activities", "الأنشطة"), activities.length],
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                className="min-w-24 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-center sm:min-w-32"
-              >
-                <p className="text-2xl font-semibold tracking-tight">{value}</p>
-                <p className="mt-0.5 text-xs text-[var(--muted)]">{label}</p>
-              </div>
-            ))}
+          <div>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {[
+                [pick(locale, "Results", "النتائج"), resultCount],
+                [pick(locale, "Agencies", "الجهات"), agencies.length],
+                [pick(locale, "Activities", "الأنشطة"), activities.length],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="min-w-24 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-center sm:min-w-32"
+                >
+                  <p className="text-2xl font-semibold tracking-tight">{value}</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">{label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+              {session ? (
+                <form action={refreshTenderDiscovery}>
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <RefreshDiscoveryButton locale={locale} />
+                </form>
+              ) : (
+                <Link
+                  href="/sign-in?next=/tenders"
+                  className="rounded-xl bg-[var(--foreground)] px-5 py-2.5 text-sm font-semibold text-white"
+                >
+                  {pick(locale, "Sign in to refresh", "سجل الدخول للتحديث")}
+                </Link>
+              )}
+              <p className="max-w-52 text-right text-xs leading-5 text-[var(--muted)]">
+                {pick(locale, "Checks Etimad for newly published and updated tenders.", "يتحقق من اعتماد بحثاً عن المنافسات المنشورة حديثاً والمحدثة.")}
+              </p>
+            </div>
           </div>
         </section>
 
+        {hasRefreshResult && (
+          <p className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-900">
+            {pick(
+              locale,
+              `Etimad refresh complete: ${refreshResult[0]} tenders checked, ${refreshResult[1]} new, and ${refreshResult[2]} updated.`,
+              `اكتمل تحديث اعتماد: تم التحقق من ${refreshResult[0]} منافسة، منها ${refreshResult[1]} جديدة و${refreshResult[2]} محدثة.`,
+            )}
+          </p>
+        )}
+        {refreshError && (
+          <p className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            {pick(locale, "Etimad refresh could not complete: ", "تعذر إكمال تحديث اعتماد: ")}
+            {refreshError}
+          </p>
+        )}
+
         <form
           action="/tenders"
-          className="mt-8 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+          className="relative z-20 mt-8 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
         >
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))]">
             <label className="grid gap-1.5 text-sm font-medium">
@@ -261,20 +329,42 @@ export default async function TendersPage({
                 className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 font-normal outline-none focus:border-[var(--accent)]"
               />
             </label>
-            <FilterSelect
+            <SearchableFilter
               label={pick(locale, "Agency", "الجهة")}
               name="agency"
               defaultValue={search.agency}
               allLabel={pick(locale, "All agencies", "كل الجهات")}
-              options={agencies.map((item) => item.agencyNameArabic)}
+              locale={locale}
+              options={agencies.map((item) => ({
+                value: item.nameArabic,
+                label:
+                  localizedMetadata(
+                    metadataTranslations,
+                    "agency",
+                    item.nameArabic,
+                    locale,
+                  ) ?? item.nameArabic,
+              }))}
             />
-            <FilterSelect
+            <SearchableFilter
               label={pick(locale, "Activity", "النشاط")}
               name="activity"
               defaultValue={search.activity}
               allLabel={pick(locale, "All activities", "كل الأنشطة")}
+              locale={locale}
               options={activities.flatMap((item) =>
-                item.activityNameArabic ? [item.activityNameArabic] : [],
+                item.activityNameArabic
+                  ? [{
+                      value: item.activityNameArabic,
+                      label:
+                        localizedMetadata(
+                          metadataTranslations,
+                          "activity",
+                          item.activityNameArabic,
+                          locale,
+                        ) ?? item.activityNameArabic,
+                    }]
+                  : [],
               )}
             />
           </div>
@@ -286,7 +376,18 @@ export default async function TendersPage({
               defaultValue={search.region}
               allLabel={pick(locale, "All enriched regions", "كل المناطق المتاحة")}
               options={regions.flatMap((item) =>
-                item.executionRegionArabic ? [item.executionRegionArabic] : [],
+                item.executionRegionArabic
+                  ? [{
+                      value: item.executionRegionArabic,
+                      label:
+                        localizedMetadata(
+                          metadataTranslations,
+                          "region",
+                          item.executionRegionArabic,
+                          locale,
+                        ) ?? item.executionRegionArabic,
+                    }]
+                  : [],
               )}
             />
             <FilterSelect
@@ -295,7 +396,18 @@ export default async function TendersPage({
               defaultValue={search.status}
               allLabel={pick(locale, "All statuses", "كل الحالات")}
               options={statuses.flatMap((item) =>
-                item.tenderStatusNameArabic ? [item.tenderStatusNameArabic] : [],
+                item.tenderStatusNameArabic
+                  ? [{
+                      value: item.tenderStatusNameArabic,
+                      label:
+                        localizedMetadata(
+                          metadataTranslations,
+                          "status",
+                          item.tenderStatusNameArabic,
+                          locale,
+                        ) ?? item.tenderStatusNameArabic,
+                    }]
+                  : [],
               )}
             />
             <label className="grid gap-1.5 text-sm font-medium">
@@ -319,8 +431,8 @@ export default async function TendersPage({
                 className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 font-normal outline-none focus:border-[var(--accent)]"
               >
                 <option value="published-desc">{pick(locale, "Newest published", "الأحدث نشراً")}</option>
-                <option value="deadline-asc">{pick(locale, "Deadline: soonest first", "الموعد: الأقرب أولاً")}</option>
-                <option value="deadline-desc">{pick(locale, "Deadline: latest first", "الموعد: الأبعد أولاً")}</option>
+                <option value="deadline-asc">{pick(locale, "Closing date: earliest first", "تاريخ الإغلاق: الأقرب أولاً")}</option>
+                <option value="deadline-desc">{pick(locale, "Closing date: furthest first", "تاريخ الإغلاق: الأبعد أولاً")}</option>
               </select>
             </label>
           </div>
@@ -343,7 +455,7 @@ export default async function TendersPage({
           </div>
         </form>
 
-        <section className="pt-8">
+        <section className="relative z-0 pt-8">
           <div className="mb-5 flex items-end justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold tracking-tight">
@@ -377,27 +489,28 @@ export default async function TendersPage({
                   return (
                 <article
                   key={tender.id}
-                  className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--border-strong)] hover:shadow-[0_12px_35px_rgba(20,55,43,0.07)] sm:p-6"
+                  className="group relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 transition duration-300 hover:-translate-y-0.5 hover:border-[var(--accent)] hover:shadow-[0_18px_45px_rgba(20,55,43,0.1)] sm:p-6"
                 >
+                  <span className="absolute inset-y-0 left-0 w-1 bg-[var(--accent)] opacity-0 transition group-hover:opacity-100" />
                   <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
                     <div className="min-w-0">
                       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-medium">
                         <span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]">
-                          {tender.tenderTypeNameArabic}
+                          {localizedMetadata(metadataTranslations, "type", tender.tenderTypeNameArabic, locale)}
                         </span>
                         {tender.activityNameArabic && (
                           <span className="rounded-full bg-[var(--background)] px-2.5 py-1 text-[var(--muted)]">
-                            {tender.activityNameArabic}
+                            {localizedMetadata(metadataTranslations, "activity", tender.activityNameArabic, locale)}
                           </span>
                         )}
                         {tender.executionRegionArabic && (
                           <span className="rounded-full bg-[var(--background)] px-2.5 py-1 text-[var(--muted)]">
-                            {tender.executionRegionArabic}
+                            {localizedMetadata(metadataTranslations, "region", tender.executionRegionArabic, locale)}
                           </span>
                         )}
                         {tender.tenderStatusNameArabic && (
                           <span className="rounded-full bg-[var(--background)] px-2.5 py-1 text-[var(--muted)]">
-                            {tender.tenderStatusNameArabic}
+                            {localizedMetadata(metadataTranslations, "status", tender.tenderStatusNameArabic, locale)}
                           </span>
                         )}
                         {tender.detailEnrichmentStatus === "complete" && (
@@ -419,14 +532,10 @@ export default async function TendersPage({
                       >
                         {title.value}
                       </h3>
-                      <div
-                        dir="rtl"
-                        lang="ar"
-                        className="mt-3 text-right text-sm leading-6 text-[var(--muted)]"
-                      >
-                        <p>{tender.agencyNameArabic}</p>
+                      <div className="mt-3 text-sm leading-6 text-[var(--muted)]">
+                        <p>{localizedMetadata(metadataTranslations, "agency", tender.agencyNameArabic, locale)}</p>
                         {tender.branchNameArabic && (
-                          <p>{tender.branchNameArabic}</p>
+                          <p>{localizedMetadata(metadataTranslations, "branch", tender.branchNameArabic, locale)}</p>
                         )}
                       </div>
                     </div>
@@ -462,16 +571,18 @@ export default async function TendersPage({
                         href={`/tenders/${tender.id}`}
                         className="mt-3 block font-semibold text-[var(--foreground)] hover:text-[var(--accent)]"
                       >
-                        {pick(locale, "Open internal details", "فتح التفاصيل الداخلية")} <span className="rtl-flip inline-block">→</span>
+                        {pick(locale, "View tender details", "عرض تفاصيل المنافسة")} <span className="rtl-flip inline-block">→</span>
                       </Link>
-                      <div className="mt-4">
-                        <DecisionControls
-                          tenderId={tender.id}
-                          status={tender.decision?.status ?? null}
-                          compact
-                          locale={locale}
-                        />
-                      </div>
+                      {session && (
+                        <div className="mt-4">
+                          <DecisionControls
+                            tenderId={tender.id}
+                            status={tender.decisions[0]?.status ?? null}
+                            compact
+                            locale={locale}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </article>

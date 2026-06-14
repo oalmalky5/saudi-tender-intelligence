@@ -13,6 +13,8 @@ import {
 import { parseLocale, pick } from "@/lib/i18n/locale";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireWorkspace } from "@/lib/auth/session";
+import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 
 export type BookletAnalysisActionState = {
   status: "idle" | "success" | "error";
@@ -30,17 +32,18 @@ export async function analyzeTenderBookletAction(
   );
 
   try {
+    const { workspace } = await requireWorkspace();
     const bookletId = formData.get("bookletId");
     if (typeof bookletId !== "string" || !bookletId.trim()) {
       throw new Error("Booklet ID is required.");
     }
 
     const [booklet, profile] = await Promise.all([
-      prisma.tenderBooklet.findUnique({
-        where: { id: bookletId },
+      prisma.tenderBooklet.findFirst({
+        where: { id: bookletId, workspaceId: workspace.id },
         include: { pages: { orderBy: { pageNumber: "asc" } } },
       }),
-      prisma.companyProfile.findUnique({ where: { id: "primary" } }),
+      prisma.companyProfile.findUnique({ where: { workspaceId: workspace.id } }),
     ]);
 
     if (!booklet) {
@@ -76,6 +79,7 @@ export async function analyzeTenderBookletAction(
       };
     }
 
+    await enforceWorkspaceRateLimit(workspace.id, RATE_LIMITS.bookletAnalysis);
     const selectedPages = selectBookletPages(booklet.pages);
     const generation = await generateBookletAnalysis(
       buildBookletAnalysisContext(booklet, selectedPages, profile),

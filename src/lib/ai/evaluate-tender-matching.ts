@@ -9,11 +9,21 @@ export type TenderMatchingEvaluation = {
 };
 
 const eligibilityOverclaimPattern =
-  /\b(eligible|eligibility confirmed|guaranteed|likely to win|will win|qualified to bid)\b/i;
+  /\b(company is eligible|eligible to bid|eligibility (?:is )?confirmed|guaranteed|likely to win|will win|qualified to bid)\b/i;
+const eligibilityVerificationPattern =
+  /\b(confirm|check|verify|determine|whether|if)\b.{0,80}\b(company is eligible|eligible to bid|qualified to bid)\b/i;
+
+function containsEligibilityOverclaim(text: string): boolean {
+  return (
+    eligibilityOverclaimPattern.test(text) &&
+    !eligibilityVerificationPattern.test(text)
+  );
+}
 
 export function evaluateTenderMatching(
   candidateIds: string[],
   content: unknown,
+  directScopeByTenderId?: ReadonlyMap<string, boolean>,
 ): TenderMatchingEvaluation {
   const parsed = tenderAiMatchingSchema.safeParse(content);
 
@@ -44,19 +54,30 @@ export function evaluateTenderMatching(
   }
 
   for (const match of result.matches) {
-    const allText = [
+    const explanationItems = [
       ...match.whyMatches,
       ...match.whyMayNotMatch,
       ...match.whatToCheckNext,
-    ].join(" ");
+    ];
 
-    if (eligibilityOverclaimPattern.test(allText)) {
+    if (explanationItems.some(containsEligibilityOverclaim)) {
       issues.push(`Tender ${match.tenderId} contains an eligibility overclaim.`);
     }
 
     if (match.confidence === "HIGH" && match.whyMayNotMatch.length === 0) {
       issues.push(
         `Tender ${match.tenderId} has high confidence without any limitations.`,
+      );
+    }
+
+    if (
+      directScopeByTenderId?.get(match.tenderId) === false &&
+      (match.whyMatches.length > 0 ||
+        match.relevanceScore > 10 ||
+        match.recommendedAction !== "IGNORE")
+    ) {
+      issues.push(
+        `Tender ${match.tenderId} presents relevance without direct-scope evidence.`,
       );
     }
   }

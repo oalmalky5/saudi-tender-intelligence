@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth/session";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { updateTenderNote } from "../actions";
@@ -13,6 +14,10 @@ import {
   hashTenderTranslationSource,
 } from "@/lib/ai/tender-translation-source";
 import { TenderTranslationPanel } from "./translation-panel";
+import {
+  loadMetadataTranslations,
+  localizedMetadata,
+} from "@/lib/translation/tender-metadata";
 import { TenderBookletPanel } from "./booklet-panel";
 
 export const dynamic = "force-dynamic";
@@ -69,20 +74,33 @@ function DetailItem({
 
 export default async function TenderDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ noteSaved?: string | string[] }>;
 }) {
   const { id } = await params;
+  const noteSavedValue = (await searchParams).noteSaved;
+  const noteSaved = Array.isArray(noteSavedValue)
+    ? noteSavedValue[0] === "1"
+    : noteSavedValue === "1";
+  const session = await getSession();
+  const workspaceId = session?.workspaceId ?? "";
   const locale = await getLocale();
-  const [tender, companyProfile] = await Promise.all([
+  const [tender, companyProfile, metadataTranslations] = await Promise.all([
     prisma.tender.findUnique({
       where: { id },
       include: {
         attachments: { orderBy: { nameArabic: "asc" } },
-        decision: true,
-        aiSummaries: { orderBy: { generatedAt: "desc" }, take: 20 },
+        decisions: { where: { workspaceId }, take: 1 },
+        aiSummaries: {
+          where: { workspaceId },
+          orderBy: { generatedAt: "desc" },
+          take: 20,
+        },
         translations: { orderBy: { generatedAt: "desc" }, take: 20 },
         booklets: {
+          where: { workspaceId },
           orderBy: { createdAt: "desc" },
           include: {
             pages: { orderBy: { pageNumber: "asc" } },
@@ -92,9 +110,10 @@ export default async function TenderDetailPage({
       },
     }),
     prisma.companyProfile.findUnique({
-      where: { id: "primary" },
+      where: { workspaceId },
       select: { id: true, updatedAt: true },
     }),
+    loadMetadataTranslations(prisma),
   ]);
 
   if (!tender) {
@@ -138,10 +157,33 @@ export default async function TenderDetailPage({
       </header>
 
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
-        <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-9">
+        {noteSaved && (
+          <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-800">
+            {pick(
+              locale,
+              "Note saved. You can review all notes from Saved → Notes.",
+              "تم حفظ الملاحظة. يمكنك مراجعة جميع الملاحظات من المحفوظات ← الملاحظات.",
+            )}
+          </div>
+        )}
+        <nav className="sticky top-3 z-20 mb-6 flex flex-wrap gap-2 rounded-2xl border border-[var(--border)] bg-white/90 p-2 shadow-[0_10px_30px_rgba(20,55,43,0.08)] backdrop-blur">
+          {[
+            ["overview", pick(locale, "Overview", "نظرة عامة")],
+            ["ai-summary", pick(locale, "AI summary", "ملخص الذكاء")],
+            ["translation", pick(locale, "Translation", "الترجمة")],
+            ["booklet", pick(locale, "Booklet analysis", "تحليل الكراسة")],
+            ["source-details", pick(locale, "Source details", "تفاصيل المصدر")],
+            ["notes", pick(locale, "Notes", "الملاحظات")],
+          ].map(([href, label]) => (
+            <a key={href} href={`#${href}`} className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]">
+              {label}
+            </a>
+          ))}
+        </nav>
+        <section id="overview" className="scroll-mt-24 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-9">
           <div className="flex flex-wrap gap-2 text-xs font-medium">
             <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[var(--accent)]">
-              {tender.tenderTypeNameArabic}
+              {localizedMetadata(metadataTranslations, "type", tender.tenderTypeNameArabic, locale)}
             </span>
             <span className="rounded-full bg-[var(--background)] px-3 py-1.5 text-[var(--muted)]">
               {pick(locale, "Ref.", "المرجع")} {tender.referenceNumber}
@@ -156,20 +198,18 @@ export default async function TenderDetailPage({
           >
             {title.value}
           </h1>
-          <p
-            dir="rtl"
-            lang="ar"
-            className="mt-4 text-right leading-7 text-[var(--muted)]"
-          >
-            {tender.agencyNameArabic}
+          <p className="mt-4 leading-7 text-[var(--muted)]">
+            {localizedMetadata(metadataTranslations, "agency", tender.agencyNameArabic, locale)}
           </p>
-          <div className="mt-6">
-            <DecisionControls
-              tenderId={tender.id}
-              status={tender.decision?.status ?? null}
-              locale={locale}
-            />
-          </div>
+          {session && (
+            <div className="mt-6">
+              <DecisionControls
+                tenderId={tender.id}
+                status={tender.decisions[0]?.status ?? null}
+                locale={locale}
+              />
+            </div>
+          )}
         </section>
 
         {!isEnriched && (
@@ -196,29 +236,39 @@ export default async function TenderDetailPage({
           </section>
         )}
 
-        <TenderSummaryPanel
-          tenderId={tender.id}
-          tenderUpdatedAt={tender.updatedAt}
-          currentCompanyProfile={companyProfile}
-          summaries={tender.aiSummaries}
-          locale={locale}
-        />
+        <div id="ai-summary" className="scroll-mt-24">
+        {session && (
+          <TenderSummaryPanel
+            tenderId={tender.id}
+            tenderUpdatedAt={tender.updatedAt}
+            currentCompanyProfile={companyProfile}
+            summaries={tender.aiSummaries}
+            locale={locale}
+          />
+        )}
+        </div>
 
+        <div id="translation" className="scroll-mt-24">
         <TenderTranslationPanel
           tenderId={tender.id}
           currentSourceHash={translationSourceHash}
           translations={tender.translations}
           locale={locale}
         />
+        </div>
 
-        <TenderBookletPanel
-          tenderId={tender.id}
-          booklets={tender.booklets}
-          companyProfileUpdatedAt={companyProfile?.updatedAt ?? null}
-          locale={locale}
-        />
+        <div id="booklet" className="scroll-mt-24">
+        {session && (
+          <TenderBookletPanel
+            tenderId={tender.id}
+            booklets={tender.booklets}
+            companyProfileUpdatedAt={companyProfile?.updatedAt ?? null}
+            locale={locale}
+          />
+        )}
+        </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div id="source-details" className="mt-6 grid scroll-mt-24 gap-6 lg:grid-cols-2">
           <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6">
             <h2 className="text-xl font-semibold">{pick(locale, "Opportunity summary", "ملخص الفرصة")}</h2>
             <dl className="mt-3">
@@ -228,25 +278,25 @@ export default async function TenderDetailPage({
                 arabic={description.direction === "rtl"}
                 locale={locale}
               />
-              <DetailItem locale={locale} label={pick(locale, "Status", "الحالة")} value={tender.tenderStatusNameArabic} arabic />
-              <DetailItem locale={locale} label={pick(locale, "Activity", "النشاط")} value={tender.activityNameArabic} arabic />
+              <DetailItem locale={locale} label={pick(locale, "Status", "الحالة")} value={localizedMetadata(metadataTranslations, "status", tender.tenderStatusNameArabic, locale)} arabic={locale === "ar"} />
+              <DetailItem locale={locale} label={pick(locale, "Activity", "النشاط")} value={localizedMetadata(metadataTranslations, "activity", tender.activityNameArabic, locale)} arabic={locale === "ar"} />
               <DetailItem
                 locale={locale}
                 label={pick(locale, "Classification", "التصنيف")}
-                value={tender.classificationFieldArabic}
-                arabic
+                value={localizedMetadata(metadataTranslations, "classification", tender.classificationFieldArabic, locale)}
+                arabic={locale === "ar"}
               />
               <DetailItem
                 locale={locale}
                 label={pick(locale, "Submission method", "طريقة التقديم")}
-                value={tender.submissionMethodArabic}
-                arabic
+                value={localizedMetadata(metadataTranslations, "submissionMethod", tender.submissionMethodArabic, locale)}
+                arabic={locale === "ar"}
               />
               <DetailItem
                 locale={locale}
                 label={pick(locale, "Contract duration", "مدة العقد")}
-                value={tender.contractDurationArabic}
-                arabic
+                value={localizedMetadata(metadataTranslations, "contractDuration", tender.contractDurationArabic, locale)}
+                arabic={locale === "ar"}
               />
             </dl>
           </section>
@@ -286,13 +336,13 @@ export default async function TenderDetailPage({
           <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6">
             <h2 className="text-xl font-semibold">{pick(locale, "Execution location", "موقع التنفيذ")}</h2>
             <dl className="mt-3">
-              <DetailItem locale={locale} label={pick(locale, "Region", "المنطقة")} value={tender.executionRegionArabic} arabic />
-              <DetailItem locale={locale} label={pick(locale, "City", "المدينة")} value={tender.executionCityArabic} arabic />
+              <DetailItem locale={locale} label={pick(locale, "Region", "المنطقة")} value={localizedMetadata(metadataTranslations, "region", tender.executionRegionArabic, locale)} arabic={locale === "ar"} />
+              <DetailItem locale={locale} label={pick(locale, "City", "المدينة")} value={localizedMetadata(metadataTranslations, "city", tender.executionCityArabic, locale)} arabic={locale === "ar"} />
               <DetailItem
                 locale={locale}
                 label={pick(locale, "Details", "التفاصيل")}
-                value={tender.executionDetailsArabic}
-                arabic
+                value={localizedMetadata(metadataTranslations, "executionDetails", tender.executionDetailsArabic, locale)}
+                arabic={locale === "ar"}
               />
             </dl>
           </section>
@@ -331,8 +381,8 @@ export default async function TenderDetailPage({
               <DetailItem
                 locale={locale}
                 label={pick(locale, "Local-content requirements", "متطلبات المحتوى المحلي")}
-                value={tender.localContentRequirementsArabic}
-                arabic
+                value={localizedMetadata(metadataTranslations, "localContent", tender.localContentRequirementsArabic, locale)}
+                arabic={locale === "ar"}
               />
             </dl>
           </section>
@@ -352,11 +402,9 @@ export default async function TenderDetailPage({
                     href={attachment.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
-                    dir="rtl"
-                    lang="ar"
-                    className="block text-right font-semibold text-[var(--accent)] hover:underline"
+                    className="block font-semibold text-[var(--accent)] hover:underline"
                   >
-                    {attachment.nameArabic} ↗
+                    {localizedMetadata(metadataTranslations, "attachment", attachment.nameArabic, locale)} ↗
                   </a>
                 </li>
               ))}
@@ -364,7 +412,7 @@ export default async function TenderDetailPage({
           )}
         </section>
 
-        <section className="mt-6 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6">
+        <section id="notes" className="mt-6 scroll-mt-24 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6">
           <h2 className="text-xl font-semibold">{pick(locale, "Your note", "ملاحظتك")}</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
             {pick(locale, "Record questions, concerns, or next actions for this tender.", "سجل الأسئلة أو المخاوف أو الخطوات التالية لهذه المنافسة.")}
@@ -373,7 +421,7 @@ export default async function TenderDetailPage({
             <input type="hidden" name="tenderId" value={tender.id} />
             <textarea
               name="note"
-              defaultValue={tender.decision?.note ?? ""}
+              defaultValue={tender.decisions[0]?.note ?? ""}
               rows={5}
               placeholder={pick(locale, "Example: Ask the technical team to review the scope before Friday.", "مثال: اطلب من الفريق الفني مراجعة النطاق قبل يوم الجمعة.")}
               className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 leading-7 outline-none focus:border-[var(--accent)]"

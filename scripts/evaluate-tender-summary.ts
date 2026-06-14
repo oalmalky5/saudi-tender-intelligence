@@ -4,6 +4,7 @@ import {
 } from "../src/lib/ai/generate-tender-summary";
 import { evaluateTenderSummary } from "../src/lib/ai/evaluate-tender-summary";
 import { buildTenderSummaryContext } from "../src/lib/ai/tender-summary-context";
+import { scoreTenderMatch } from "../src/lib/matching/score-tender";
 import { prisma } from "../src/lib/prisma";
 
 async function main(): Promise<void> {
@@ -36,10 +37,20 @@ async function main(): Promise<void> {
     detailEnrichmentStatus: tender.detailEnrichmentStatus,
     submissionDeadline: tender.submissionDeadline,
     hasCompanyProfile: companyProfile !== null,
+    hasDirectScopeMatch: companyProfile
+      ? scoreTenderMatch(companyProfile, tender).hasDirectScopeMatch
+      : undefined,
   });
+
+  if (!evaluation.passed) {
+    throw new Error(
+      `Summary failed deterministic checks: ${evaluation.issues.join(" ")}`,
+    );
+  }
 
   await prisma.tenderAiSummary.create({
     data: {
+      workspaceId: "primary-workspace",
       tenderId: tender.id,
       companyProfileId: companyProfile?.id ?? null,
       content: JSON.parse(JSON.stringify(generation.content)),

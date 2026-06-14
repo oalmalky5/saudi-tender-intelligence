@@ -1,10 +1,14 @@
 "use server";
 
+import { evaluateTenderSummary } from "@/lib/ai/evaluate-tender-summary";
 import { generateTenderSummary, TENDER_SUMMARY_PROMPT_VERSION } from "@/lib/ai/generate-tender-summary";
 import { buildTenderSummaryContext } from "@/lib/ai/tender-summary-context";
 import { prisma } from "@/lib/prisma";
 import { parseLocale, pick } from "@/lib/i18n/locale";
+import { scoreTenderMatch } from "@/lib/matching/score-tender";
 import { revalidatePath } from "next/cache";
+import { requireWorkspace } from "@/lib/auth/session";
+import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 
 export type SummaryActionState = {
   status: "idle" | "success" | "error";
@@ -26,6 +30,7 @@ export async function generateTenderSummaryAction(
   formData: FormData,
 ): Promise<SummaryActionState> {
   try {
+    const { workspace } = await requireWorkspace();
     const tenderId = readTenderId(formData);
     const locale = parseLocale(
       typeof formData.get("locale") === "string"
@@ -37,7 +42,7 @@ export async function generateTenderSummaryAction(
         where: { id: tenderId },
         include: { attachments: { select: { nameArabic: true } } },
       }),
-      prisma.companyProfile.findUnique({ where: { id: "primary" } }),
+      prisma.companyProfile.findUnique({ where: { workspaceId: workspace.id } }),
     ]);
 
     if (!tender) {
@@ -48,10 +53,27 @@ export async function generateTenderSummaryAction(
     }
 
     const context = buildTenderSummaryContext(tender, companyProfile);
+    await enforceWorkspaceRateLimit(workspace.id, RATE_LIMITS.paidAi);
     const generation = await generateTenderSummary(context);
+    const evaluation = evaluateTenderSummary({
+      content: generation.content,
+      detailEnrichmentStatus: tender.detailEnrichmentStatus,
+      submissionDeadline: tender.submissionDeadline,
+      hasCompanyProfile: companyProfile !== null,
+      hasDirectScopeMatch: companyProfile
+        ? scoreTenderMatch(companyProfile, tender).hasDirectScopeMatch
+        : undefined,
+    });
+
+    if (!evaluation.passed) {
+      throw new Error(
+        `Summary failed deterministic checks: ${evaluation.issues.join(" ")}`,
+      );
+    }
 
     await prisma.tenderAiSummary.create({
       data: {
+        workspaceId: workspace.id,
         tenderId: tender.id,
         companyProfileId: companyProfile?.id ?? null,
         content: JSON.parse(JSON.stringify(generation.content)),

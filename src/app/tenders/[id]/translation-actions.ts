@@ -12,6 +12,8 @@ import {
 import { parseLocale, pick } from "@/lib/i18n/locale";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireWorkspace } from "@/lib/auth/session";
+import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 
 export type TranslationActionState = {
   status: "idle" | "success" | "error";
@@ -29,6 +31,7 @@ export async function translateTenderAction(
   );
 
   try {
+    const { workspace } = await requireWorkspace();
     const tenderId = formData.get("tenderId");
 
     if (typeof tenderId !== "string" || !tenderId.trim()) {
@@ -50,6 +53,7 @@ export async function translateTenderAction(
       where: {
         tenderId: tender.id,
         sourceHash,
+        provider: "OPENAI",
         promptVersion: TENDER_TRANSLATION_PROMPT_VERSION,
       },
       orderBy: { generatedAt: "desc" },
@@ -76,6 +80,7 @@ export async function translateTenderAction(
       };
     }
 
+    await enforceWorkspaceRateLimit(workspace.id, RATE_LIMITS.paidAi);
     const generation = await generateTenderTranslation(source);
     const evaluation = evaluateTenderTranslation(source, generation.content);
 
@@ -92,6 +97,8 @@ export async function translateTenderAction(
           titleEnglish: generation.content.titleEnglish,
           descriptionEnglish: generation.content.descriptionEnglish,
           sourceHash,
+          provider: "OPENAI",
+          translationType: "IMPROVED",
           model: generation.model,
           promptVersion: TENDER_TRANSLATION_PROMPT_VERSION,
           openaiResponseId: generation.openaiResponseId,

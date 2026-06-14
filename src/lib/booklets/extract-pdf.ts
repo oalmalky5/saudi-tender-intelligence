@@ -42,7 +42,9 @@ export async function extractPdfPages(
   bytes: Uint8Array,
 ): Promise<ExtractedBooklet> {
   const document = await getDocument({
-    data: bytes,
+    // pdfjs may transfer and detach the supplied ArrayBuffer. Preserve the
+    // caller's bytes for hashing, persistence, and later validation.
+    data: bytes.slice(),
     useSystemFonts: true,
   }).promise;
   const pages: ExtractedBookletPage[] = [];

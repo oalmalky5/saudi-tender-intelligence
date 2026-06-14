@@ -8,7 +8,9 @@ function finding() {
     statement: "The booklet requires a technical proposal.",
     sourceType: "TENDER_SPECIFIC" as const,
     confidence: "HIGH" as const,
-    citations: [{ pageNumber: 12, excerpt: "العرض الفني" }],
+    citations: [
+      { citationId: "p012-s001", pageNumber: 12, excerpt: "العرض الفني" },
+    ],
   };
 }
 

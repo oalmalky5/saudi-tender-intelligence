@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildBookletAnalysisContext,
+  buildBookletCitationCatalog,
   estimateBookletAnalysisCostUsd,
   selectBookletPages,
 } from "./booklet-analysis-context";
@@ -27,6 +29,19 @@ test("selects first pages and relevant later pages within the cap", () => {
   );
 });
 
+test("selects the full booklet when every page fits within both caps", () => {
+  const pages = Array.from({ length: 35 }, (_, index) => ({
+    pageNumber: index + 1,
+    text: "نص قصير",
+    characterCount: 8,
+  }));
+
+  assert.deepEqual(
+    selectBookletPages(pages).map((page) => page.pageNumber),
+    pages.map((page) => page.pageNumber),
+  );
+});
+
 test("returns a small positive conservative estimate", () => {
   const estimate = estimateBookletAnalysisCostUsd([
     page(1, "a".repeat(10_000)),
@@ -34,4 +49,33 @@ test("returns a small positive conservative estimate", () => {
 
   assert.ok(estimate > 0);
   assert.ok(estimate < 1);
+});
+
+test("builds stable exact citation snippets without changing source text", () => {
+  const text = `${"كلمة ".repeat(100)}نهاية`;
+  const catalog = buildBookletCitationCatalog([page(7, text)]);
+
+  assert.ok(catalog.length > 1);
+  assert.equal(catalog[0].citationId, "p007-s001");
+  for (const citation of catalog) {
+    assert.equal(citation.pageNumber, 7);
+    assert.ok(text.includes(citation.excerpt));
+  }
+});
+
+test("uses the citation catalog instead of raw page text in AI context", () => {
+  const context = buildBookletAnalysisContext(
+    { originalName: "booklet.pdf", sha256: "hash", pageCount: 1 },
+    [page(1, "يجب تقديم العرض الفني")],
+    null,
+  );
+
+  assert.equal("pages" in context, false);
+  assert.deepEqual(context.citationCatalog, [
+    {
+      citationId: "p001-s001",
+      pageNumber: 1,
+      excerpt: "يجب تقديم العرض الفني",
+    },
+  ]);
 });

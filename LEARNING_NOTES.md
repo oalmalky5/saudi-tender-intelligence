@@ -1179,3 +1179,117 @@ quality before listing every command.
 - The safe demo seed detected the existing Catalyft profile and preserved it.
 - Git ignore checks confirmed sensitive and generated paths remain untracked.
 - 84 automated tests, lint, Prisma validation, and the production build passed.
+
+## Milestone 17 — Unified AI Evaluation Scorecard
+
+Feature-specific evaluation checks become more persuasive when they can be run
+as one understandable quality story.
+
+### Evaluation Design
+
+The portfolio scorecard contains both:
+
+- valid outputs that the application must accept
+- unsafe or unsupported outputs that the application must reject
+
+This distinction matters. A guardrail that rejects everything is not useful,
+and an evaluator that only tests successful examples does not demonstrate
+protection against model failures.
+
+### Representative Risks
+
+- missing tender data hidden by a confident summary
+- invented translation details and dropped source numbers
+- eligibility claims presented as relevance reasoning
+- chat citations outside the retrieved evidence
+- reports forced to recommend weak opportunities
+- booklet citations whose excerpts do not exist on the cited page
+
+An honest no-match chat answer and a zero-match weekly report are explicit
+passing scenarios.
+
+### Result
+
+`npm run ai:portfolio:evaluate` runs 14 scenarios without contacting OpenAI:
+
+- 14 scenarios behaved as expected
+- 7 valid outputs were accepted
+- 7 unsafe or unsupported outputs were rejected
+- 0 paid requests were made
+
+Deterministic evaluation proves contract enforcement, not subjective model
+quality. Factual usefulness, Arabic interpretation, and recommendation quality
+still require representative live outputs and human review.
+
+### Live Evaluation Improvement Loop
+
+The first live Catalyft matching run recommended `IGNORE` for every candidate
+and scored them at 10% or below, but still put indirect supplier-support ideas
+inside `whyMatches`. Automated checks passed while human review correctly
+identified the explanations as misleading.
+
+The matching contract now requires candidates without deterministic
+direct-scope evidence to have:
+
+- an empty `whyMatches` list
+- a relevance score no higher than 10
+- an `IGNORE` recommendation
+
+Prompt `tender-matching-v3` passed the regression run for all 10 candidates.
+The weekly report also correctly stated that no current tenders match Catalyft;
+the records it retained were clearly categorized as ignore, risk, or
+closing-soon market-awareness items rather than recommendations.
+
+The same loop found summary issues that schema checks initially missed. Summary
+`v3` and `v4` produced reasonable-sounding but unsupported external actions.
+The accepted `v5` output limits next actions to what the product can support
+from stored evidence.
+
+`npm run ai:stored:audit` now re-runs current guardrails against every historical
+stored generation. Older failures remain stored because they are useful
+evidence of how the product learned and improved.
+
+### Booklet Citation Architecture
+
+Repeated live booklet analyses showed that asking a model to copy extracted
+Arabic excerpts character-for-character is not a dependable citation system.
+Even useful analyses can alter whitespace, punctuation, or word order enough
+to fail exact verification.
+
+The stronger contract is application-owned evidence:
+
+- extraction creates stable citation snippets and IDs
+- the model selects only citation IDs
+- application code attaches the trusted page number and exact excerpt
+- deterministic evaluation rejects unknown, altered, or mismatched citations
+
+This moves citation correctness from prompt compliance into code while leaving
+the model responsible for interpretation and prioritization.
+
+The same principle applies to known unsafe output categories. When the model
+repeatedly returned indirect bidder-support services as company fit despite
+clear instructions, the production path began filtering those notes
+deterministically. Prompts guide behavior; code enforces product policy.
+
+The following live `v5` regression validated the approach: every citation
+passed, unsafe indirect-fit notes were removed, honest direct-capability gaps
+remained, and the useful analysis was stored.
+
+## Milestone 18 — Authentication and Workspace Authorization
+
+Authentication answers who the user is; authorization answers which records
+that user may access. A route redirect alone is not authorization because a
+Server Action can still be invoked directly.
+
+The portfolio demo therefore uses layered checks:
+
+- a signed HTTP-only cookie maintains the session
+- Next.js Proxy redirects anonymous private-route requests quickly
+- private pages and every Server Action verify the user/workspace in the
+  database
+- private database reads and mutations include the authenticated workspace ID
+
+Public Etimad tender records remain shared, while decisions, company data,
+summaries, chats, uploads, reports, notifications, and admin workflows are
+private. This demonstrates a credible ownership boundary without adding teams,
+roles, organization switching, SSO, or other enterprise account complexity.

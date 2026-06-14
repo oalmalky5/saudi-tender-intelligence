@@ -39,5 +39,16 @@ The command and web button use the same report-generation service.
   analyzed.
 - A company profile is required.
 - PDF and Word export are deferred.
-- Report quality and cost still need live evaluation using a representative
-  company profile.
+
+## Live Evaluation
+
+### 2026-06-14 — Catalyft no-match report
+
+- The report reviewed 20 curated candidates and explicitly concluded that none
+  requested work Catalyft plausibly delivers.
+- Six tenders remained in the report only as `IGNORE`, `HIGH_RISK`, or
+  `CLOSING_SOON` market-awareness items; none were presented as a matching
+  opportunity.
+- The report clearly separated scope relevance from eligibility and disclosed
+  incomplete public-data limitations.
+- The run used 7,794 tokens and cost approximately `$0.005478`.

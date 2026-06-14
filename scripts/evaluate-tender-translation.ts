@@ -38,6 +38,8 @@ async function main(): Promise<void> {
           tenderId: tender.id,
           ...generation.content,
           sourceHash,
+          provider: "OPENAI",
+          translationType: "IMPROVED",
           model: generation.model,
           promptVersion: TENDER_TRANSLATION_PROMPT_VERSION,
           openaiResponseId: generation.openaiResponseId,

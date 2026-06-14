@@ -8,6 +8,7 @@ export type TenderSummaryEvaluationInput = {
   detailEnrichmentStatus: string;
   submissionDeadline: Date | null;
   hasCompanyProfile: boolean;
+  hasDirectScopeMatch?: boolean;
 };
 
 export type TenderSummaryEvaluation = {
@@ -17,6 +18,8 @@ export type TenderSummaryEvaluation = {
 
 const eligibilityOverclaimPattern =
   /\b(eligible|eligibility confirmed|guaranteed|likely to win|will win|qualified to bid)\b/i;
+const unsupportedActionPattern =
+  /\b(contact|request|download|purchase|pay|obtain|prepare|clarify|confirm|verify)\b/i;
 
 function allSummaryText(content: TenderAiSummaryContent): string {
   return [
@@ -49,6 +52,14 @@ export function evaluateTenderSummary(
 
   if (!input.hasCompanyProfile && content.fitNotes.length > 0) {
     issues.push("Fit notes were generated without a company profile.");
+  }
+
+  if (input.hasDirectScopeMatch === false && content.fitNotes.length > 0) {
+    issues.push("Fit notes were generated without direct-scope evidence.");
+  }
+
+  if (content.nextActions.some((action) => unsupportedActionPattern.test(action))) {
+    issues.push("Next actions contain unsupported external or bid-preparation instructions.");
   }
 
   if (

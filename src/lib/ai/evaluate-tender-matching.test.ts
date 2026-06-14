@@ -47,3 +47,36 @@ test("flags eligibility overclaims", () => {
   assert.equal(result.passed, false);
   assert.match(result.issues.join(" "), /overclaim/);
 });
+
+test("allows eligibility to be presented as something to verify", () => {
+  const result = evaluateTenderMatching(["one"], {
+    matches: [
+      {
+        ...match("one"),
+        whatToCheckNext: ["Confirm whether the company is eligible to participate."],
+      },
+    ],
+  });
+
+  assert.equal(result.passed, true);
+});
+
+test("rejects indirect bidder-support reasoning as a company match", () => {
+  const result = evaluateTenderMatching(
+    ["one"],
+    {
+      matches: [
+        {
+          ...match("one"),
+          relevanceScore: 10,
+          whyMatches: ["The supplier may need onboarding support."],
+          recommendedAction: "IGNORE",
+        },
+      ],
+    },
+    new Map([["one", false]]),
+  );
+
+  assert.equal(result.passed, false);
+  assert.match(result.issues.join(" "), /without direct-scope evidence/);
+});

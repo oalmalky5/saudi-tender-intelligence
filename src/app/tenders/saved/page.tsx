@@ -5,6 +5,8 @@ import { LanguageSwitcher } from "@/app/language-switcher";
 import { pick } from "@/lib/i18n/locale";
 import { getLocale } from "@/lib/i18n/locale-server";
 import { localizedTenderText } from "@/lib/i18n/tender-text";
+import { requireWorkspace } from "@/lib/auth/session";
+import { loadMetadataTranslations, localizedMetadata } from "@/lib/translation/tender-metadata";
 
 export const dynamic = "force-dynamic";
 
@@ -21,26 +23,39 @@ export default async function SavedTendersPage({
 }: {
   searchParams: Promise<SavedPageParams>;
 }) {
-  const view = first((await searchParams).view) === "ignored" ? "ignored" : "saved";
+  const requestedView = first((await searchParams).view);
+  const view =
+    requestedView === "ignored"
+      ? "ignored"
+      : requestedView === "notes"
+        ? "notes"
+        : "saved";
+  const { workspace } = await requireWorkspace();
   const locale = await getLocale();
   const status = view === "ignored" ? "IGNORED" : "SAVED";
-  const decisions = await prisma.tenderDecision.findMany({
-    where: { status },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      tender: {
-        select: {
-          id: true,
-          referenceNumber: true,
-          titleArabic: true,
-          titleEnglish: true,
-          agencyNameArabic: true,
-          activityNameArabic: true,
-          submissionDeadline: true,
+  const [decisions, metadataTranslations] = await Promise.all([
+    prisma.tenderDecision.findMany({
+      where: {
+        workspaceId: workspace.id,
+        ...(view === "notes" ? { note: { not: null } } : { status }),
+      },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        tender: {
+          select: {
+            id: true,
+            referenceNumber: true,
+            titleArabic: true,
+            titleEnglish: true,
+            agencyNameArabic: true,
+            activityNameArabic: true,
+            submissionDeadline: true,
+          },
         },
       },
-    },
-  });
+    }),
+    loadMetadataTranslations(prisma),
+  ]);
 
   return (
     <main className="min-h-screen">
@@ -54,7 +69,7 @@ export default async function SavedTendersPage({
             <Link href="/company" className="hover:text-[var(--accent)]">
               {pick(locale, "Company profile", "ملف الشركة")}
             </Link>
-            <span className="text-[var(--muted)]">{pick(locale, "Decision workspace", "مساحة القرارات")}</span>
+            <span className="text-[var(--muted)]">{pick(locale, "Saved workspace", "المساحة المحفوظة")}</span>
             <LanguageSwitcher locale={locale} />
           </div>
         </div>
@@ -62,13 +77,23 @@ export default async function SavedTendersPage({
 
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         <h1 className="text-4xl font-semibold tracking-[-0.04em]">
-          {pick(locale, "Manage tender decisions", "إدارة قرارات المنافسات")}
+          {pick(locale, "Saved tenders and notes", "المنافسات والملاحظات المحفوظة")}
         </h1>
         <p className="mt-3 max-w-2xl leading-7 text-[var(--muted)]">
           {pick(locale, "Saved tenders stay visible here. Ignored tenders are hidden from the default browser but can always be restored.", "تبقى المنافسات المحفوظة ظاهرة هنا. يتم إخفاء المنافسات المستبعدة من المتصفح الافتراضي ويمكن استعادتها دائماً.")}
         </p>
 
         <nav className="mt-7 flex gap-2">
+          <Link
+            href="/tenders/saved?view=notes"
+            className={`rounded-xl px-4 py-2.5 text-sm font-semibold ${
+              view === "notes"
+                ? "bg-[var(--accent)] text-white"
+                : "border border-[var(--border)] bg-white"
+            }`}
+          >
+            {pick(locale, "Notes", "الملاحظات")}
+          </Link>
           <Link
             href="/tenders/saved"
             className={`rounded-xl px-4 py-2.5 text-sm font-semibold ${
@@ -96,14 +121,16 @@ export default async function SavedTendersPage({
             <h2 className="text-xl font-semibold">
               {view === "saved"
                 ? pick(locale, "No saved tenders yet", "لا توجد منافسات محفوظة بعد")
-                : pick(locale, "No ignored tenders yet", "لا توجد منافسات مستبعدة بعد")}
+                : view === "notes"
+                  ? pick(locale, "No saved notes yet", "لا توجد ملاحظات محفوظة بعد")
+                  : pick(locale, "No ignored tenders yet", "لا توجد منافسات مستبعدة بعد")}
             </h2>
             <p className="mt-2 text-[var(--muted)]">
-              {pick(locale, "Decisions made in the tender browser will appear here.", "ستظهر هنا القرارات التي تتخذها في متصفح المنافسات.")}
+              {pick(locale, "Saved tenders, notes, and ignored opportunities will appear here.", "ستظهر هنا المنافسات والملاحظات المحفوظة والفرص المستبعدة.")}
             </p>
           </section>
         ) : (
-          <div className="mt-8 grid gap-4">
+          <div className="mt-8 grid gap-4 lg:grid-cols-2">
             {decisions.map((decision) => (
               (() => {
                 const title = localizedTenderText(
@@ -114,7 +141,7 @@ export default async function SavedTendersPage({
                 return (
               <article
                 key={decision.id}
-                className="rounded-2xl border border-[var(--border)] bg-white p-5 sm:p-6"
+                className="rounded-3xl border border-[var(--border)] bg-white p-5 shadow-[0_8px_28px_rgba(20,55,43,0.04)] transition hover:-translate-y-0.5 hover:border-[var(--accent)] sm:p-6"
               >
                 <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
                   <div>
@@ -131,12 +158,8 @@ export default async function SavedTendersPage({
                     >
                       {title.value}
                     </Link>
-                    <p
-                      dir="rtl"
-                      lang="ar"
-                      className="mt-2 text-right text-sm text-[var(--muted)]"
-                    >
-                      {decision.tender.agencyNameArabic}
+                    <p className="mt-2 text-sm text-[var(--muted)]">
+                      {localizedMetadata(metadataTranslations, "agency", decision.tender.agencyNameArabic, locale)}
                     </p>
                     {decision.note && (
                       <p className="mt-4 rounded-xl bg-[var(--background)] p-4 text-sm leading-6">

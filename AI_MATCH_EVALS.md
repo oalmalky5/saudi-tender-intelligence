@@ -52,3 +52,20 @@ necessary for relevance quality and factual grounding.
 - No paid API request was made and no matching run was stored.
 - Create a representative company profile in `/company` before the first live
   ranking evaluation.
+
+### 2026-06-14 — Catalyft no-match regression
+
+- Prompt `tender-matching-v2` ranked 10 unrelated candidates at 10% or below
+  and recommended `IGNORE` for every candidate.
+- Deterministic checks passed, but human review found that `whyMatches` still
+  described indirect bidder-support possibilities such as registration,
+  onboarding, or tender readiness.
+- That language was misleading even though the final recommendations were
+  correct.
+- The evaluator now rejects any candidate without deterministic direct-scope
+  evidence when it has non-empty `whyMatches`, a score above 10, or an action
+  other than `IGNORE`.
+- Prompt `tender-matching-v3` passed the strengthened regression: all 10
+  candidates had empty `whyMatches`, scores from 1 to 10, and `IGNORE`
+  recommendations.
+- The corrected run used 6,078 tokens and cost approximately `$0.00561275`.

@@ -1,3 +1,5 @@
+import { scoreTenderMatch } from "@/lib/matching/score-tender";
+
 type NullableDate = Date | null;
 type NullableValue = string | number | boolean | null;
 
@@ -130,6 +132,10 @@ export function buildTenderSummaryContext(
   tender: TenderSummarySource,
   companyProfile: CompanySummarySource | null,
 ) {
+  const companyRelevance = companyProfile
+    ? scoreTenderMatch(companyProfile, tender)
+    : null;
+
   return {
     tender: removeEmptyValues({
       referenceNumber: tender.referenceNumber,
@@ -183,6 +189,7 @@ export function buildTenderSummaryContext(
           preferredOpportunityTypes: companyProfile.preferredOpportunityTypes,
         })
       : null,
+    companyRelevance,
     knownMissingInformation: knownMissingInformation(tender),
   };
 }

@@ -4,12 +4,15 @@ import { saveCompanyProfile } from "./actions";
 import { LanguageSwitcher } from "@/app/language-switcher";
 import { dateLocale, pick } from "@/lib/i18n/locale";
 import { getLocale } from "@/lib/i18n/locale-server";
+import { requireWorkspace } from "@/lib/auth/session";
+import { loadMetadataTranslations, localizedMetadata } from "@/lib/translation/tender-metadata";
 
 export const dynamic = "force-dynamic";
 
 type CompanyPageParams = {
   saved?: string | string[];
   error?: string | string[];
+  edit?: string | string[];
 };
 
 function first(value: string | string[] | undefined): string {
@@ -56,17 +59,21 @@ export default async function CompanyProfilePage({
   searchParams: Promise<CompanyPageParams>;
 }) {
   const params = await searchParams;
+  const { workspace } = await requireWorkspace();
   const locale = await getLocale();
   const saved = first(params.saved) === "1";
   const error = first(params.error);
-  const [profile, opportunityTypes] = await Promise.all([
-    prisma.companyProfile.findUnique({ where: { id: "primary" } }),
+  const requestedEdit = first(params.edit) === "1";
+  const [profile, opportunityTypes, metadataTranslations] = await Promise.all([
+    prisma.companyProfile.findUnique({ where: { workspaceId: workspace.id } }),
     prisma.tender.findMany({
       distinct: ["tenderTypeNameArabic"],
       orderBy: { tenderTypeNameArabic: "asc" },
       select: { tenderTypeNameArabic: true },
     }),
+    loadMetadataTranslations(prisma),
   ]);
+  const editing = !profile || requestedEdit;
 
   return (
     <main className="min-h-screen">
@@ -115,6 +122,14 @@ export default async function CompanyProfilePage({
                   })}
                   .
                 </p>
+                {!editing && (
+                  <Link
+                    href="/company?edit=1"
+                    className="mt-4 inline-flex rounded-xl bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white"
+                  >
+                    {pick(locale, "Edit profile", "تعديل الملف")}
+                  </Link>
+                )}
               </>
             ) : (
               <>
@@ -141,6 +156,7 @@ export default async function CompanyProfilePage({
         )}
 
         <form action={saveCompanyProfile} className="mt-8 grid gap-6">
+          <fieldset disabled={!editing} className="contents disabled:opacity-75">
           <section className="rounded-3xl border border-[var(--border)] bg-white p-6 sm:p-8">
             <h2 className="text-xl font-semibold">{pick(locale, "Company identity", "هوية الشركة")}</h2>
             <div className="mt-5 grid gap-5">
@@ -242,11 +258,9 @@ export default async function CompanyProfilePage({
               {opportunityTypes.map(({ tenderTypeNameArabic }) => (
                 <label
                   key={tenderTypeNameArabic}
-                  dir="rtl"
-                  lang="ar"
-                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-right text-sm"
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-sm"
                 >
-                  <span>{tenderTypeNameArabic}</span>
+                  <span>{localizedMetadata(metadataTranslations, "type", tenderTypeNameArabic, locale)}</span>
                   <input
                     type="checkbox"
                     name="preferredOpportunityTypes"
@@ -262,15 +276,24 @@ export default async function CompanyProfilePage({
           </section>
 
           <div className="flex items-center justify-end">
+            {profile && editing && (
+              <Link
+                href="/company"
+                className="mr-3 rounded-xl border border-[var(--border)] bg-white px-6 py-3 text-sm font-semibold"
+              >
+                {pick(locale, "Cancel", "إلغاء")}
+              </Link>
+            )}
             <button
               type="submit"
               className="rounded-xl bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-white hover:opacity-90"
             >
               {profile
-                ? pick(locale, "Update company profile", "تحديث ملف الشركة")
+                ? pick(locale, "Save profile changes", "حفظ تغييرات الملف")
                 : pick(locale, "Create company profile", "إنشاء ملف الشركة")}
             </button>
           </div>
+          </fieldset>
         </form>
       </div>
     </main>

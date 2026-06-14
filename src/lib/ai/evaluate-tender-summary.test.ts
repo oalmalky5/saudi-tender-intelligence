@@ -63,3 +63,20 @@ test("rejects fit notes without a company profile", () => {
   assert.equal(result.passed, false);
   assert.match(result.issues.join(" "), /without a company profile/);
 });
+
+test("rejects indirect fit notes and unsupported next actions", () => {
+  const result = evaluateTenderSummary({
+    content: summary({
+      fitNotes: ["The company can help another bidder with registration."],
+      nextActions: ["Contact the agency and prepare the bid submission."],
+    }),
+    detailEnrichmentStatus: "complete",
+    submissionDeadline: new Date("2026-07-01T00:00:00.000Z"),
+    hasCompanyProfile: true,
+    hasDirectScopeMatch: false,
+  });
+
+  assert.equal(result.passed, false);
+  assert.match(result.issues.join(" "), /without direct-scope evidence/);
+  assert.match(result.issues.join(" "), /unsupported external/);
+});

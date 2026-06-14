@@ -1,11 +1,11 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { requireWorkspace } from "@/lib/auth/session";
 import { runMonitoring } from "@/lib/monitoring/run-monitoring";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
-const PRIMARY_PROFILE_ID = "primary";
+import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 
 function integerSetting(
   formData: FormData,
@@ -21,10 +21,18 @@ function integerSetting(
 }
 
 export async function runMonitoringNow(): Promise<void> {
+  const { workspace } = await requireWorkspace();
+  if (!workspace.companyProfile) {
+    redirect("/company?error=Create+a+company+profile+before+monitoring.");
+  }
   let runId: string;
 
   try {
-    const run = await runMonitoring(prisma);
+    await enforceWorkspaceRateLimit(workspace.id, RATE_LIMITS.monitoring);
+    const run = await runMonitoring(prisma, {
+      workspaceId: workspace.id,
+      companyProfileId: workspace.companyProfile.id,
+    });
     runId = run.id;
   } catch (error) {
     const message =
@@ -41,6 +49,7 @@ export async function runMonitoringNow(): Promise<void> {
 export async function saveNotificationSettings(
   formData: FormData,
 ): Promise<void> {
+  const { workspace } = await requireWorkspace();
   const threshold = integerSetting(
     formData,
     "notificationRelevanceThreshold",
@@ -59,7 +68,7 @@ export async function saveNotificationSettings(
   }
 
   await prisma.companyProfile.update({
-    where: { id: PRIMARY_PROFILE_ID },
+    where: { workspaceId: workspace.id },
     data: {
       notificationRelevanceThreshold: threshold,
       deadlineReminderDays: reminderDays,
@@ -72,21 +81,23 @@ export async function saveNotificationSettings(
 }
 
 export async function markNotificationRead(formData: FormData): Promise<void> {
+  const { workspace } = await requireWorkspace();
   const notificationId = formData.get("notificationId");
   if (typeof notificationId !== "string" || !notificationId) {
     throw new Error("Notification ID is required.");
   }
 
-  await prisma.notification.update({
-    where: { id: notificationId },
+  await prisma.notification.updateMany({
+    where: { id: notificationId, companyProfile: { workspaceId: workspace.id } },
     data: { readAt: new Date() },
   });
   revalidatePath("/notifications");
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
+  const { workspace } = await requireWorkspace();
   await prisma.notification.updateMany({
-    where: { companyProfileId: PRIMARY_PROFILE_ID, readAt: null },
+    where: { companyProfile: { workspaceId: workspace.id }, readAt: null },
     data: { readAt: new Date() },
   });
   revalidatePath("/notifications");

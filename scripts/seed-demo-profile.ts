@@ -58,7 +58,11 @@ async function main(): Promise<void> {
 
   await prisma.companyProfile.upsert({
     where: { id: PRIMARY_PROFILE_ID },
-    create: { id: PRIMARY_PROFILE_ID, ...demoProfile },
+    create: {
+      id: PRIMARY_PROFILE_ID,
+      workspaceId: "primary-workspace",
+      ...demoProfile,
+    },
     update: demoProfile,
   });
 

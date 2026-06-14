@@ -6,6 +6,7 @@ import { dateLocale, pick, type Locale } from "@/lib/i18n/locale";
 import { getLocale } from "@/lib/i18n/locale-server";
 import { localizedTenderText } from "@/lib/i18n/tender-text";
 import { prisma } from "@/lib/prisma";
+import { requireWorkspace } from "@/lib/auth/session";
 
 import { WeeklyReportControls } from "./report-controls";
 
@@ -38,13 +39,15 @@ function ListSection({ title, items }: { title: string; items: string[] }) {
 }
 
 export default async function WeeklyReportsPage() {
+  const { workspace } = await requireWorkspace();
+  const profileId = workspace.companyProfile?.id ?? "";
   const locale = await getLocale();
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1_000);
   const [profile, reports] = await Promise.all([
-    prisma.companyProfile.findUnique({ where: { id: "primary" } }),
+    prisma.companyProfile.findUnique({ where: { workspaceId: workspace.id } }),
     prisma.weeklyTenderReport.findMany({
-      where: { companyProfileId: "primary" },
+      where: { companyProfileId: profileId },
       orderBy: { generatedAt: "desc" },
       take: 10,
       include: {
@@ -81,14 +84,29 @@ export default async function WeeklyReportsPage() {
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         <section>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-            {pick(locale, "Weekly AI tender report", "تقرير المنافسات الأسبوعي بالذكاء الاصطناعي")}
+            {pick(locale, "Weekly tender reports", "تقارير المنافسات الأسبوعية")}
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
-            {pick(locale, "Turn the tender database into a weekly decision brief.", "حوّل قاعدة المنافسات إلى موجز قرار أسبوعي.")}
+            {pick(locale, "Review your weekly tender report.", "راجع تقرير المنافسات الأسبوعي.")}
           </h1>
           <p className="mt-4 max-w-3xl leading-7 text-[var(--muted)]">
             {pick(locale, "The report prioritizes relevant opportunities, urgent deadlines, material risks, unsuitable tenders, and practical next review steps using only stored public data.", "يرتب التقرير الفرص المناسبة والمواعيد العاجلة والمخاطر المهمة والمنافسات غير المناسبة وخطوات المراجعة التالية باستخدام البيانات العامة المخزنة فقط.")}
           </p>
+        </section>
+
+        <section className="mt-8 grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-[var(--border)] bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{pick(locale, "Stored reports", "التقارير المحفوظة")}</p>
+            <p className="mt-2 text-3xl font-semibold">{reports.length}</p>
+          </div>
+          <div className="rounded-2xl border border-[var(--border)] bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{pick(locale, "Company profile", "ملف الشركة")}</p>
+            <p className="mt-2 font-semibold">{profile?.companyName ?? pick(locale, "Not configured", "غير مُعد")}</p>
+          </div>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--accent-soft)] p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">{pick(locale, "Latest report", "أحدث تقرير")}</p>
+            <p className="mt-2 font-semibold">{reports[0] ? formatDate(reports[0].generatedAt, locale) : pick(locale, "Generate your first report", "أنشئ تقريرك الأول")}</p>
+          </div>
         </section>
 
         {!profile ? (

@@ -7,8 +7,11 @@ type StoredTranslation = {
   titleEnglish: string;
   descriptionEnglish: string | null;
   sourceHash: string;
+  provider: string;
+  translationType: string;
   model: string;
   promptVersion: string;
+  characterCount: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
   totalTokens: number | null;
@@ -48,8 +51,8 @@ export function TenderTranslationPanel({
           <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--muted)]">
             {pick(
               locale,
-              "Generated manually from the public Arabic title and description. The Arabic source remains authoritative.",
-              "تُنشأ يدوياً من العنوان والوصف العربيين العامين، ويبقى المصدر العربي هو المرجع المعتمد.",
+              "Automatically translated for English browsing, with an optional OpenAI improvement. The Arabic source remains authoritative.",
+              "تُترجم تلقائياً للتصفح باللغة الإنجليزية مع تحسين اختياري عبر OpenAI، ويبقى المصدر العربي هو المرجع المعتمد.",
             )}
           </p>
         </div>
@@ -75,6 +78,11 @@ export function TenderTranslationPanel({
             <span className="rounded-full bg-[var(--background)] px-3 py-1.5 text-[var(--muted)]">
               {latest.model} · {latest.promptVersion}
             </span>
+            <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[var(--accent)]">
+              {latest.provider === "AZURE"
+                ? "Automatic machine translation"
+                : "OpenAI improved translation"}
+            </span>
             {isStale && (
               <span className="rounded-full bg-amber-100 px-3 py-1.5 text-amber-800">
                 Stale: Arabic title or description changed
@@ -88,12 +96,15 @@ export function TenderTranslationPanel({
           </p>
 
           <p className="mt-6 text-xs leading-5 text-[var(--muted)]">
-            Usage: {latest.inputTokens ?? "unknown"} input tokens ·{" "}
-            {latest.outputTokens ?? "unknown"} output tokens ·{" "}
-            {latest.totalTokens ?? "unknown"} total tokens
-            {latest.estimatedCostUsd
-              ? ` · Estimated cost $${latest.estimatedCostUsd.toString()}`
-              : ""}
+            {latest.provider === "AZURE"
+              ? `Usage: ${latest.characterCount ?? "unknown"} translated characters`
+              : `Usage: ${latest.inputTokens ?? "unknown"} input tokens · ${
+                  latest.outputTokens ?? "unknown"
+                } output tokens · ${latest.totalTokens ?? "unknown"} total tokens${
+                  latest.estimatedCostUsd
+                    ? ` · Estimated cost $${latest.estimatedCostUsd.toString()}`
+                    : ""
+                }`}
             {" · "}
             {translations.length} stored {translations.length === 1 ? "version" : "versions"}
           </p>

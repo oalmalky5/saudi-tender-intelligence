@@ -6,6 +6,7 @@ import type { CsvTenderField } from "@/lib/csv/tender-csv-schema";
 import { dateLocale, pick } from "@/lib/i18n/locale";
 import { getLocale } from "@/lib/i18n/locale-server";
 import { prisma } from "@/lib/prisma";
+import { requireWorkspace } from "@/lib/auth/session";
 
 import { confirmCsvImport, previewCsvImport } from "./actions";
 
@@ -30,15 +31,19 @@ export default async function CsvImportPage({
   searchParams: Promise<PageParams>;
 }) {
   const params = await searchParams;
+  const { workspace } = await requireWorkspace();
   const locale = await getLocale();
   const sessionId = first(params.session);
   const error = first(params.error);
   const imported = first(params.imported) === "1";
   const [session, recentSessions] = await Promise.all([
     sessionId
-      ? prisma.csvImportSession.findUnique({ where: { id: sessionId } })
+      ? prisma.csvImportSession.findFirst({
+          where: { id: sessionId, workspaceId: workspace.id },
+        })
       : null,
     prisma.csvImportSession.findMany({
+      where: { workspaceId: workspace.id },
       orderBy: { createdAt: "desc" },
       take: 10,
     }),

@@ -11,7 +11,11 @@ async function main(): Promise<void> {
   const [profile, tenders] = await Promise.all([
     prisma.companyProfile.findUnique({ where: { id: "primary" } }),
     prisma.tender.findMany({
-      where: { NOT: { decision: { is: { status: "IGNORED" } } } },
+      where: {
+        decisions: {
+          none: { workspaceId: "primary-workspace", status: "IGNORED" },
+        },
+      },
       orderBy: { publishedAt: "desc" },
       take: 120,
       select: {
@@ -56,6 +60,12 @@ async function main(): Promise<void> {
   const evaluation = evaluateTenderMatching(
     candidates.map((candidate) => candidate.id),
     generation.content,
+    new Map(
+      candidates.map((candidate) => [
+        candidate.id,
+        candidate.deterministicMatch.hasDirectScopeMatch,
+      ]),
+    ),
   );
 
   if (evaluation.passed) {

@@ -9,6 +9,8 @@ import { buildTenderMatchingContext } from "@/lib/ai/tender-matching-context";
 import { parseLocale, pick } from "@/lib/i18n/locale";
 import { selectAiMatchingCandidates } from "@/lib/matching/select-ai-candidates";
 import { prisma } from "@/lib/prisma";
+import { requireWorkspace } from "@/lib/auth/session";
+import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 import { revalidatePath } from "next/cache";
 
 export type AiMatchingActionState = {
@@ -27,10 +29,13 @@ export async function generateAiMatchingAction(
   );
 
   try {
+    const { workspace } = await requireWorkspace();
     const [profile, tenders] = await Promise.all([
-      prisma.companyProfile.findUnique({ where: { id: "primary" } }),
+      prisma.companyProfile.findUnique({ where: { workspaceId: workspace.id } }),
       prisma.tender.findMany({
-        where: { NOT: { decision: { is: { status: "IGNORED" } } } },
+        where: {
+          decisions: { none: { workspaceId: workspace.id, status: "IGNORED" } },
+        },
         orderBy: { publishedAt: "desc" },
         take: 120,
         select: {
@@ -85,16 +90,32 @@ export async function generateAiMatchingAction(
       };
     }
 
+    await enforceWorkspaceRateLimit(workspace.id, RATE_LIMITS.paidAi);
     const generation = await generateTenderMatching(
       buildTenderMatchingContext(profile, candidates),
     );
     const candidateIds = candidates.map((candidate) => candidate.id);
-    const evaluation = evaluateTenderMatching(candidateIds, generation.content);
+    const directScopeByTenderId = new Map(
+      candidates.map((candidate) => [
+        candidate.id,
+        candidate.deterministicMatch.hasDirectScopeMatch,
+      ]),
+    );
+    const evaluation = evaluateTenderMatching(
+      candidateIds,
+      generation.content,
+      directScopeByTenderId,
+    );
 
     if (!evaluation.passed) {
-      throw new Error(
-        `AI matching failed deterministic checks: ${evaluation.issues.join(" ")}`,
-      );
+      return {
+        status: "error",
+        message: pick(
+          locale,
+          "The new shortlist was not saved because its explanations included an unsupported claim. Your previous shortlist is unchanged. Please run it again.",
+          "لم يتم حفظ القائمة المختصرة الجديدة لأن تفسيراتها تضمنت ادعاءً غير مدعوم. لم تتغير قائمتك السابقة. يرجى تشغيلها مرة أخرى.",
+        ),
+      };
     }
 
     const candidateById = new Map(

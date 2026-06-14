@@ -1,4 +1,4 @@
-export const MAX_ANALYZED_BOOKLET_PAGES = 30;
+export const MAX_ANALYZED_BOOKLET_PAGES = 35;
 export const MAX_ANALYZED_BOOKLET_CHARACTERS = 100_000;
 
 type BookletPage = {
@@ -6,6 +6,14 @@ type BookletPage = {
   text: string;
   characterCount: number;
 };
+
+export type BookletCitationSnippet = {
+  citationId: string;
+  pageNumber: number;
+  excerpt: string;
+};
+
+export type BookletAnalysisContext = ReturnType<typeof buildBookletAnalysisContext>;
 
 type CompanyProfileInput = {
   companyName: string;
@@ -66,6 +74,18 @@ function pageScore(page: BookletPage): number {
 }
 
 export function selectBookletPages(pages: BookletPage[]): BookletPage[] {
+  const totalDocumentCharacters = pages.reduce(
+    (total, page) => total + page.characterCount,
+    0,
+  );
+
+  if (
+    pages.length <= MAX_ANALYZED_BOOKLET_PAGES &&
+    totalDocumentCharacters <= MAX_ANALYZED_BOOKLET_CHARACTERS
+  ) {
+    return [...pages].sort((left, right) => left.pageNumber - right.pageNumber);
+  }
+
   const firstPages = pages.slice(0, 5);
   const firstPageNumbers = new Set(firstPages.map((page) => page.pageNumber));
   const ranked = pages
@@ -107,6 +127,48 @@ export function estimateBookletAnalysisCostUsd(
   return (conservativeInputTokens * 0.25 + expectedOutputTokens * 2) / 1_000_000;
 }
 
+export function buildBookletCitationCatalog(
+  pages: Array<{ pageNumber: number; text: string }>,
+): BookletCitationSnippet[] {
+  const catalog: BookletCitationSnippet[] = [];
+
+  for (const page of pages) {
+    let offset = 0;
+    let snippetNumber = 1;
+
+    while (offset < page.text.length) {
+      while (offset < page.text.length && /\s/.test(page.text[offset])) {
+        offset += 1;
+      }
+      if (offset >= page.text.length) {
+        break;
+      }
+
+      const hardEnd = Math.min(offset + 320, page.text.length);
+      let end = hardEnd;
+      if (hardEnd < page.text.length) {
+        const whitespace = page.text.lastIndexOf(" ", hardEnd);
+        if (whitespace >= offset + 160) {
+          end = whitespace;
+        }
+      }
+
+      const excerpt = page.text.slice(offset, end).trimEnd();
+      if (excerpt) {
+        catalog.push({
+          citationId: `p${String(page.pageNumber).padStart(3, "0")}-s${String(snippetNumber).padStart(3, "0")}`,
+          pageNumber: page.pageNumber,
+          excerpt,
+        });
+        snippetNumber += 1;
+      }
+      offset = end;
+    }
+  }
+
+  return catalog;
+}
+
 export function buildBookletAnalysisContext(
   booklet: {
     originalName: string;
@@ -116,6 +178,8 @@ export function buildBookletAnalysisContext(
   pages: BookletPage[],
   companyProfile: CompanyProfileInput,
 ) {
+  const citationCatalog = buildBookletCitationCatalog(pages);
+
   return {
     purpose:
       "Create a cited English qualification review from selected conditions-booklet pages.",
@@ -126,9 +190,6 @@ export function buildBookletAnalysisContext(
         "Only the supplied pages are available to this analysis. Absence from these pages does not prove absence from the full booklet.",
     },
     companyProfile,
-    pages: pages.map((page) => ({
-      pageNumber: page.pageNumber,
-      text: page.text,
-    })),
+    citationCatalog,
   };
 }

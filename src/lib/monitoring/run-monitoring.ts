@@ -1,10 +1,13 @@
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { fetchEtimadListPages } from "@/lib/etimad/fetch-list-pages";
 import { fetchEtimadTenderDetail } from "@/lib/etimad/fetch-tender-detail";
+import { syncEtimadGovernmentAgencies } from "@/lib/etimad/government-agencies";
 import { mapEtimadListTender } from "@/lib/etimad/map-list-tender";
 import { parseEtimadTenderDetail } from "@/lib/etimad/parse-tender-detail";
 import { persistTenderDetail } from "@/lib/etimad/persist-tender-detail";
 import { persistTenderList } from "@/lib/etimad/persist-list-tenders";
+import { automaticallyTranslateTenders } from "@/lib/translation/automatic-tender-translation";
+import { translateTenderMetadata } from "@/lib/translation/tender-metadata";
 
 import { classifyTenderChanges, tenderVersionKey } from "./change-detection";
 import {
@@ -14,12 +17,12 @@ import {
   type NotificationTender,
 } from "./notifications";
 
-const PRIMARY_PROFILE_ID = "primary";
-
 export type MonitoringOptions = {
   pageLimit?: number;
   enrichmentLimit?: number;
   now?: Date;
+  workspaceId?: string;
+  companyProfileId?: string;
 };
 
 export async function runMonitoring(
@@ -29,10 +32,15 @@ export async function runMonitoring(
   const pageLimit = options.pageLimit ?? 5;
   const enrichmentLimit = options.enrichmentLimit ?? 5;
   const now = options.now ?? new Date();
-  const run = await db.monitoringRun.create({ data: { status: "running" } });
+  const workspaceId = options.workspaceId ?? "primary-workspace";
+  const companyProfileId = options.companyProfileId ?? "primary";
+  const run = await db.monitoringRun.create({
+    data: { workspaceId, status: "running" },
+  });
 
   try {
     const pages = await fetchEtimadListPages(pageLimit);
+    await syncEtimadGovernmentAgencies(db, now);
     const incoming = pages.tenders.map(mapEtimadListTender);
     const references = incoming.map((tender) => tender.referenceNumber);
     const existing = await db.tender.findMany({
@@ -84,8 +92,23 @@ export async function runMonitoring(
       }
     }
 
+    const affectedTenderIds = await db.tender.findMany({
+      where: {
+        referenceNumber: {
+          in: affected.map((tender) => tender.referenceNumber),
+        },
+      },
+      select: { id: true },
+    });
+    await automaticallyTranslateTenders(
+      db,
+      affectedTenderIds.map((tender) => tender.id),
+      affectedTenderIds.length,
+    );
+    await translateTenderMetadata(db);
+
     const profile = await db.companyProfile.findUnique({
-      where: { id: PRIMARY_PROFILE_ID },
+      where: { id: companyProfileId },
     });
     let notificationCount = 0;
 
@@ -129,7 +152,7 @@ export async function runMonitoring(
       const reminderCandidates = (await db.tender.findMany({
         where: {
           submissionDeadline: { gte: now, lte: reminderEnd },
-          NOT: { decision: { is: { status: "IGNORED" } } },
+          decisions: { none: { workspaceId, status: "IGNORED" } },
         },
         select: tenderSelect,
       })) as NotificationTender[];
@@ -213,7 +236,7 @@ export async function runMonitoring(
       data: { status: "failed", errorMessage: message, completedAt: new Date() },
     });
     const profile = await db.companyProfile.findUnique({
-      where: { id: PRIMARY_PROFILE_ID },
+      where: { id: companyProfileId },
       select: { id: true },
     });
     if (profile) {

@@ -11,6 +11,8 @@ import { hashBooklet, storeBooklet } from "@/lib/booklets/storage";
 import { parseLocale, pick } from "@/lib/i18n/locale";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireWorkspace } from "@/lib/auth/session";
+import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 
 export type BookletUploadActionState = {
   status: "idle" | "success" | "error";
@@ -28,6 +30,7 @@ export async function uploadTenderBookletAction(
   );
 
   try {
+    const { workspace } = await requireWorkspace();
     const tenderId = formData.get("tenderId");
     const file = formData.get("booklet");
 
@@ -56,7 +59,13 @@ export async function uploadTenderBookletAction(
 
     const sha256 = hashBooklet(bytes);
     const duplicate = await prisma.tenderBooklet.findUnique({
-      where: { tenderId_sha256: { tenderId: tender.id, sha256 } },
+      where: {
+        workspaceId_tenderId_sha256: {
+          workspaceId: workspace.id,
+          tenderId: tender.id,
+          sha256,
+        },
+      },
       select: { id: true },
     });
 
@@ -71,12 +80,14 @@ export async function uploadTenderBookletAction(
       };
     }
 
+    await enforceWorkspaceRateLimit(workspace.id, RATE_LIMITS.bookletUpload);
     const storedPath = await storeBooklet(tender.id, sha256, bytes);
     const extraction = await extractPdfPages(bytes);
     const originalName = path.basename(file.name).slice(0, 255);
 
     await prisma.tenderBooklet.create({
       data: {
+        workspaceId: workspace.id,
         tenderId: tender.id,
         originalName,
         storedPath,

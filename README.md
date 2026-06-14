@@ -1,4 +1,4 @@
-# Etimad Tender Intelligence
+# Tender Intelligence
 
 An English-first tender intelligence platform for Saudi government
 procurement. It imports real public Etimad tenders, makes them easier to
@@ -13,7 +13,7 @@ official Etimad integration or a production Catalyft service.
 
 Etimad publishes valuable procurement opportunities, but discovering relevant
 tenders requires navigating Arabic-first records, scattered public details,
-and detailed conditions booklets. Etimad Tender Intelligence turns that
+and detailed conditions booklets. Tender Intelligence turns that
 workflow into a clearer decision process:
 
 1. Ingest and normalize public Etimad tender data.
@@ -27,13 +27,15 @@ workflow into a clearer decision process:
 ## Product Highlights
 
 - Real public Etimad data with idempotent imports and detail enrichment
-- English/Arabic interface with on-demand English tender translation
+- English/Arabic interface with automatic Azure tender translation and
+  optional OpenAI translation improvement
 - Explainable deterministic matching before paid AI matching
 - Explicit no-match behavior instead of forced recommendations
 - Grounded tender summaries and database chat with source references
 - On-demand Arabic PDF booklet analysis with page citations
 - New/changed tender monitoring and in-app notifications
 - Weekly company-specific tender reports
+- Signed demo authentication and user-owned private workspaces
 - Structured AI outputs, deterministic checks, evaluation logs, and cost
   tracking
 - Responsive interface with accessible motion and clear loading/empty states
@@ -119,8 +121,13 @@ npm run etimad:import
 Add the non-sensitive demonstration company profile:
 
 ```bash
+npm run auth:seed-demo
 npm run demo:seed
 ```
+
+The local demo login is `demo@etimad.local` / `demo12345`. Set
+`DEMO_USER_EMAIL`, `DEMO_USER_PASSWORD`, and a strong `SESSION_SECRET` before
+deployment. Running `auth:seed-demo` again resets the demo credentials.
 
 The seed command refuses to overwrite an existing primary profile. To
 deliberately replace it:
@@ -164,6 +171,7 @@ overrides, the application uses its configured mini-model defaults.
 | Workflow | Route or command |
 | --- | --- |
 | Discover and filter tenders | `/tenders` |
+| Sign in to the demo workspace | `/sign-in` |
 | Create the company profile | `/company` |
 | Review deterministic and AI matches | `/tenders/recommended` |
 | Ask grounded database questions | `/chat` |
@@ -174,7 +182,9 @@ overrides, the application uses its configured mini-model defaults.
 | Run the monitoring job | `npm run monitor:run` |
 
 Tender detail pages contain enrichment, decisions, translation, AI summary,
-and booklet upload/analysis workflows.
+and authenticated booklet upload/analysis workflows. Public tender discovery
+does not expose private workspace decisions, summaries, chats, reports,
+notifications, uploads, or company data.
 
 ## Verification
 
@@ -216,6 +226,8 @@ renders database-backed routes during production verification.
   investigation
 - [LEARNING_NOTES.md](LEARNING_NOTES.md): concepts and decisions learned while
   building
+- [AI_EVALUATION_SCORECARD.md](AI_EVALUATION_SCORECARD.md): reproducible
+  portfolio AI guardrail results
 - `*_EVALS.md`: AI evaluation methods and representative run logs
 - [MONITORING.md](MONITORING.md): monitoring behavior and scheduling boundary
 - [WEEKLY_REPORTS.md](WEEKLY_REPORTS.md): weekly-report pipeline and limits

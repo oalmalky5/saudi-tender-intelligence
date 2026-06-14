@@ -4,13 +4,13 @@ import {
   companyProfileSchema,
   parseProfileList,
 } from "@/lib/company/profile-schema";
+import { requireWorkspace } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-const PRIMARY_PROFILE_ID = "primary";
-
 export async function saveCompanyProfile(formData: FormData): Promise<void> {
+  const { workspace } = await requireWorkspace();
   const result = companyProfileSchema.safeParse({
     companyName: formData.get("companyName"),
     summary: formData.get("summary"),
@@ -34,8 +34,12 @@ export async function saveCompanyProfile(formData: FormData): Promise<void> {
   }
 
   await prisma.companyProfile.upsert({
-    where: { id: PRIMARY_PROFILE_ID },
-    create: { id: PRIMARY_PROFILE_ID, ...result.data },
+    where: { workspaceId: workspace.id },
+    create: {
+      id: `profile-${workspace.id}`,
+      workspaceId: workspace.id,
+      ...result.data,
+    },
     update: result.data,
   });
 

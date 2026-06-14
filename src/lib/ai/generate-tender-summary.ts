@@ -4,7 +4,7 @@ import {
   type TenderAiSummaryContent,
 } from "./tender-summary-schema";
 
-export const TENDER_SUMMARY_PROMPT_VERSION = "tender-summary-v3";
+export const TENDER_SUMMARY_PROMPT_VERSION = "tender-summary-v5";
 export const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -104,8 +104,11 @@ export async function generateTenderSummary(
             "Distinguish confirmed requirements from risks or questions.",
             "Report fee and cost fields using their supplied labels. Do not infer that every listed amount must be paid or instruct payment unless the data explicitly says so.",
             "Next actions must be safe review steps. Do not instruct purchase, payment, submission, or bidding as mandatory when the source does not explicitly require it.",
+            "Next actions must stay inside the application's evidence boundary: save or ignore the tender, monitor for source updates, enrich available public details, compare known dates, or record missing information.",
+            "Do not instruct contacting, requesting, downloading, purchasing, paying, obtaining, preparing, clarifying, confirming, or verifying anything outside the supplied application data. State those topics as questions or missing information instead.",
             "Do not instruct the user to download or review tender documents unless public attachments are supplied. The purchased tender-document contents are unavailable.",
             "If companyProfile is null, leave fitNotes empty and do not describe that absence as a tender risk.",
+            "If companyRelevance.hasDirectScopeMatch is false, leave fitNotes empty. Helping another bidder with registration, onboarding, Etimad readiness, or submission does not make the underlying tender relevant to the company.",
             "Use supplied Riyadh date-time strings exactly and identify them as Riyadh time when relevant.",
             "Keep every list concise, prioritized, and at no more than 8 items.",
             "Fit notes describe relevance only. Never claim eligibility, likely success, or winning probability.",

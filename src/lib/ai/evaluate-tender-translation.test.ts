@@ -24,3 +24,12 @@ test("flags invented descriptions and missing source numbers", () => {
     "Source number 2026 is missing from the translation.",
   ]);
 });
+
+test("accepts an unchanged title when the Etimad source is already English", () => {
+  const evaluation = evaluateTenderTranslation(
+    { titleArabic: "LAUNDRY LIQUID DETERGENT", descriptionArabic: null },
+    { titleEnglish: "LAUNDRY LIQUID DETERGENT", descriptionEnglish: null },
+  );
+
+  assert.equal(evaluation.passed, true);
+});

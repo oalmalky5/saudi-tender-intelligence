@@ -13,6 +13,10 @@ function normalized(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function containsArabic(value: string): boolean {
+  return /\p{Script=Arabic}/u.test(value);
+}
+
 function sourceNumbers(source: TenderTranslationSource): string[] {
   return [
     ...source.titleArabic.matchAll(/\d+(?:[.,]\d+)*/g),
@@ -48,6 +52,7 @@ export function evaluateTenderTranslation(
   }
 
   if (
+    containsArabic(source.titleArabic) &&
     normalized(translation.titleEnglish) === normalized(source.titleArabic)
   ) {
     issues.push("The title was returned unchanged instead of translated.");

@@ -67,7 +67,23 @@ necessary for factual accuracy and usefulness.
   estimated `$0.002562`. Riyadh dates and fee wording improved, but human review
   still found unsupported document-download advice and inferred missing fields.
 - Prompt `v3` now receives an application-derived `knownMissingInformation`
-  list and tighter action rules. It has not made a paid API request yet.
+  list and tighter action rules.
+
+### 2026-06-14 — Catalyft fit and action-boundary regression
+
+- Prompt `v3` passed the earlier deterministic checks, but human review found
+  indirect Catalyft fit notes and unsupported instructions to contact the
+  agency, request documents, prepare certification, and confirm payment.
+- The summary evaluator now rejects fit notes when deterministic matching finds
+  no direct-scope evidence and rejects external or bid-preparation instructions
+  in `nextActions`.
+- Prompt `v4` removed the false fit notes but still instructed obtaining
+  documents, clarifying requirements, and preparing a compliance checklist.
+- Prompt `v5` passed the strengthened checks and human review. Its fit notes
+  were empty and its actions stayed within the application's evidence boundary:
+  recording known data, marking missing information, comparing known dates,
+  and monitoring source updates.
+- The accepted `v5` run used 2,945 tokens and cost approximately `$0.0025125`.
 
 This run demonstrates why deterministic checks are useful but cannot replace
 human evaluation.

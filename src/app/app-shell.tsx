@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { pick, type Locale } from "@/lib/i18n/locale";
 
 import { LanguageSwitcher } from "./language-switcher";
+import { signOutAction } from "./sign-in/actions";
 
 type IconName =
   | "discover"
@@ -37,7 +38,7 @@ const navigation: Array<{
   {
     href: "/tenders/saved",
     icon: "saved",
-    label: ["Decisions", "القرارات"],
+    label: ["Saved", "المحفوظات"],
     active: (path) => path.startsWith("/tenders/saved"),
   },
   {
@@ -49,13 +50,13 @@ const navigation: Array<{
   {
     href: "/notifications",
     icon: "notifications",
-    label: ["Signals", "الإشارات"],
+    label: ["Notifications", "التنبيهات"],
     active: (path) => path.startsWith("/notifications"),
   },
   {
     href: "/reports/weekly",
     icon: "report",
-    label: ["Briefs", "الموجزات"],
+    label: ["Reports", "التقارير"],
     active: (path) => path.startsWith("/reports"),
   },
   {
@@ -86,12 +87,18 @@ function Icon({ name }: { name: IconName }) {
 
 export function AppShell({
   locale,
+  authenticated,
   children,
 }: {
   locale: Locale;
+  authenticated: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+
+  if (pathname === "/sign-in") {
+    return children;
+  }
 
   return (
     <div className="app-shell">
@@ -99,10 +106,10 @@ export function AppShell({
       <div className="ambient ambient-two" />
 
       <aside className="app-sidebar">
-        <Link href="/tenders" className="brand-mark" aria-label="Etimad Intelligence">
+        <Link href="/tenders" className="brand-mark" aria-label="Tender Intelligence">
           <span className="brand-orbit"><span /></span>
           <span className="brand-copy">
-            <strong>Etimad</strong>
+            <strong>Tender</strong>
             <small>Intelligence</small>
           </span>
         </Link>
@@ -137,13 +144,24 @@ export function AppShell({
             {pick(locale, "Data tools", "أدوات البيانات")}
           </Link>
           <LanguageSwitcher locale={locale} />
+          {authenticated ? (
+            <form action={signOutAction}>
+              <button type="submit" className="sign-out-button">
+                {pick(locale, "Sign out", "تسجيل الخروج")}
+              </button>
+            </form>
+          ) : (
+            <Link href="/sign-in" className="sign-out-button">
+              {pick(locale, "Sign in", "تسجيل الدخول")}
+            </Link>
+          )}
         </div>
       </aside>
 
       <header className="mobile-topbar">
-        <Link href="/tenders" className="brand-mark" aria-label="Etimad Intelligence">
+        <Link href="/tenders" className="brand-mark" aria-label="Tender Intelligence">
           <span className="brand-orbit"><span /></span>
-          <span className="brand-copy"><strong>Etimad</strong><small>Intelligence</small></span>
+          <span className="brand-copy"><strong>Tender</strong><small>Intelligence</small></span>
         </Link>
         <LanguageSwitcher locale={locale} />
       </header>

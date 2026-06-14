@@ -5,7 +5,7 @@ import {
   type TenderAiMatchingContent,
 } from "./tender-matching-schema";
 
-export const TENDER_MATCHING_PROMPT_VERSION = "tender-matching-v2";
+export const TENDER_MATCHING_PROMPT_VERSION = "tender-matching-v3";
 export const DEFAULT_OPENAI_MATCHING_MODEL = "gpt-5-mini";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -88,6 +88,7 @@ export async function generateTenderMatching(
             "A strong fit requires direct evidence that the company could deliver the tender's underlying requested scope itself.",
             "Helping another bidder with registration, readiness, onboarding, or tender workflow does not make the underlying contract a fit.",
             "Public-sector context, SME preference, target entity, geography, and industry familiarity are only secondary context and cannot establish fit without direct scope evidence.",
+            "When deterministicMatch.hasDirectScopeMatch is false, whyMatches must be empty, relevanceScore must be at most 10, and recommendedAction must be IGNORE.",
             "Give irrelevant candidates low scores and recommend IGNORE. Do not manufacture matches merely because every candidate must be ranked.",
             "Never claim that the company is eligible, qualified, likely to win, or guaranteed to succeed.",
             "Public tender data and conditions-booklet requirements may be incomplete. State concrete limitations and what should be checked next.",

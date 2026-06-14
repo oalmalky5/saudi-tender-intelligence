@@ -1,13 +1,16 @@
 "use server";
 
+import { requireWorkspace } from "@/lib/auth/session";
 import { csvTenderSchema, MAX_CSV_BYTES } from "@/lib/csv/tender-csv-schema";
 import { parseTenderCsv } from "@/lib/csv/parse-tender-csv";
 import { persistCsvTenders } from "@/lib/csv/persist-csv-tenders";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 
 export async function previewCsvImport(formData: FormData): Promise<void> {
+  const { workspace } = await requireWorkspace();
   const file = formData.get("csv");
 
   if (!(file instanceof File) || file.size === 0) {
@@ -20,9 +23,11 @@ export async function previewCsvImport(formData: FormData): Promise<void> {
   let sessionId: string;
 
   try {
+    await enforceWorkspaceRateLimit(workspace.id, RATE_LIMITS.csvImport);
     const preview = parseTenderCsv(await file.text());
     const session = await prisma.csvImportSession.create({
       data: {
+        workspaceId: workspace.id,
         originalName: file.name.slice(0, 255),
         status: "preview",
         headerMapping: JSON.parse(JSON.stringify(preview.headerMapping)),
@@ -44,14 +49,15 @@ export async function previewCsvImport(formData: FormData): Promise<void> {
 }
 
 export async function confirmCsvImport(formData: FormData): Promise<void> {
+  const { workspace } = await requireWorkspace();
   const sessionId = formData.get("sessionId");
 
   if (typeof sessionId !== "string" || !sessionId) {
     redirect("/admin/import?error=Import+session+is+required.");
   }
 
-  const session = await prisma.csvImportSession.findUnique({
-    where: { id: sessionId },
+  const session = await prisma.csvImportSession.findFirst({
+    where: { id: sessionId, workspaceId: workspace.id },
   });
 
   if (!session || session.status !== "preview") {

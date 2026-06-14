@@ -36,10 +36,12 @@ const tenderSelect = {
 
 export async function retrieveTendersForChat(
   plan: TenderChatRetrievalPlan,
+  companyProfileId = "primary",
+  workspaceId = "primary-workspace",
   now = new Date(),
 ) {
   const profile = plan.requiresCompanyProfile
-    ? await prisma.companyProfile.findUnique({ where: { id: "primary" } })
+    ? await prisma.companyProfile.findUnique({ where: { id: companyProfileId } })
     : null;
 
   if (plan.mode === "company_fit") {
@@ -48,7 +50,7 @@ export async function retrieveTendersForChat(
     }
 
     const tenders = await prisma.tender.findMany({
-      where: { NOT: { decision: { is: { status: "IGNORED" } } } },
+      where: { decisions: { none: { workspaceId, status: "IGNORED" } } },
       orderBy: { publishedAt: "desc" },
       take: 120,
       select: tenderSelect,
@@ -76,7 +78,7 @@ export async function retrieveTendersForChat(
   }
 
   let where: Prisma.TenderWhereInput = {
-    NOT: { decision: { is: { status: "IGNORED" } } },
+    decisions: { none: { workspaceId, status: "IGNORED" } },
   };
   let orderBy: Prisma.TenderOrderByWithRelationInput[] = [
     { publishedAt: "desc" },

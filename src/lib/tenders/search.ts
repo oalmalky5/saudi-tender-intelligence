@@ -11,6 +11,8 @@ export type TenderSearchParams = {
   deadline?: string | string[];
   sort?: string | string[];
   page?: string | string[];
+  refresh?: string | string[];
+  refreshError?: string | string[];
 };
 
 export type TenderSearch = {

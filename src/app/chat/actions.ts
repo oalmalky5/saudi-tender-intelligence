@@ -10,12 +10,23 @@ import {
 } from "@/lib/ai/generate-tender-chat";
 import { parseLocale, pick } from "@/lib/i18n/locale";
 import { prisma } from "@/lib/prisma";
+import { requireWorkspace } from "@/lib/auth/session";
+import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 import { revalidatePath } from "next/cache";
 
 export type TenderChatActionState = {
   status: "idle" | "success" | "error";
   message: string;
 };
+
+export async function clearTenderConversationAction(): Promise<void> {
+  const { workspace } = await requireWorkspace();
+  await prisma.tenderChatRun.updateMany({
+    where: { workspaceId: workspace.id, clearedAt: null },
+    data: { clearedAt: new Date() },
+  });
+  revalidatePath("/chat");
+}
 
 export async function askTenderDatabaseAction(
   _previousState: TenderChatActionState,
@@ -28,6 +39,7 @@ export async function askTenderDatabaseAction(
   );
 
   try {
+    const { workspace } = await requireWorkspace();
     const questionValue = formData.get("question");
     if (typeof questionValue !== "string") {
       throw new Error("Question is required.");
@@ -38,13 +50,18 @@ export async function askTenderDatabaseAction(
     }
 
     const plan = buildTenderChatRetrievalPlan(question);
-    const retrieval = await retrieveTendersForChat(plan);
+    const retrieval = await retrieveTendersForChat(
+      plan,
+      workspace.companyProfile?.id ?? "",
+      workspace.id,
+    );
     const context = buildTenderChatContext(
       question,
       { ...plan, limitation: retrieval.limitation },
       retrieval.tenders,
       retrieval.profile,
     );
+    await enforceWorkspaceRateLimit(workspace.id, RATE_LIMITS.paidAi);
     const generation = await generateTenderChatAnswer(context);
     const tenderIds = retrieval.tenders.map((tender) => tender.id);
     const evaluation = evaluateTenderChatAnswer(tenderIds, generation.content);
@@ -57,6 +74,7 @@ export async function askTenderDatabaseAction(
 
     await prisma.tenderChatRun.create({
       data: {
+        workspaceId: workspace.id,
         question,
         content: JSON.parse(JSON.stringify(generation.content)),
         retrieval: JSON.parse(JSON.stringify({ ...plan, limitation: retrieval.limitation })),

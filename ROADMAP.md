@@ -710,6 +710,10 @@ Translation stays manual during development so API spend remains intentional.
 Automatic translation of every imported tender should only be considered after
 quality and cost are measured on a representative evaluation set.
 
+Update: automatic translation is now implemented through Azure Translator for
+new and changed tenders. The original OpenAI action remains available as an
+optional improved translation.
+
 ### Done when
 
 A user can translate one tender on demand, view the English result, identify a
@@ -1306,6 +1310,64 @@ with reproducible results is more valuable for the portfolio.
 The project can demonstrate both useful recommendations and honest refusal or
 no-match behavior, with evidence showing how AI quality was evaluated.
 
+### Implementation
+
+- Added one reproducible portfolio scorecard covering summaries, translation,
+  AI matching, database chat, weekly reports, and booklet analysis.
+- Added 16 representative scenarios that exercise both valid outputs and
+  adversarial failures.
+- Included explicit scenarios for honest no-match behavior, missing-data
+  concealment, invented translation details, eligibility overclaims,
+  indirect bidder-support reasoning, unretrieved citations, and fabricated
+  booklet citation IDs.
+- Added `npm run ai:portfolio:evaluate`; it runs locally without making any
+  OpenAI requests.
+- Documented the evaluation layers, current results, and limits in
+  `AI_EVALUATION_SCORECARD.md`.
+
+### Current Deterministic Result
+
+- 16 of 16 representative scenarios behaved as expected.
+- 7 valid outputs were accepted.
+- 9 unsafe or unsupported outputs were rejected.
+- 0 paid OpenAI requests were made.
+
+### Initial Live-Model Review
+
+- Matching prompt `v2` correctly scored 10 unrelated Catalyft candidates at
+  10% or below and recommended `IGNORE`, but human review found misleading
+  indirect bidder-support statements in `whyMatches`.
+- Matching prompt `v3` requires empty `whyMatches`, a score of at most 10, and
+  `IGNORE` whenever deterministic matching finds no direct-scope evidence.
+- The `v3` regression run satisfied the strengthened contract for all 10
+  candidates and cost approximately `$0.00561`.
+- The live weekly report explicitly reported zero Catalyft matches. Its six
+  reviewed tenders were included only as `IGNORE`, `HIGH_RISK`, or
+  `CLOSING_SOON` market-awareness items and cost approximately `$0.00548`.
+- Summary prompts `v3` and `v4` exposed indirect fit and unsupported external
+  action instructions during human review.
+- Summary prompt `v5` passed the strengthened fit/action guardrails and human
+  review, costing approximately `$0.00251`.
+- `npm run ai:stored:audit` now re-evaluates all stored real outputs against
+  current guardrails. It currently audits 13 outputs, with 8 current passes and
+  5 deliberately preserved historical failures.
+- The representative 35-page conditions booklet was extracted locally without
+  OCR. Three live analysis attempts exposed unreliable model-written Arabic
+  excerpts and indirect company-fit reasoning; all failed outputs were rejected
+  and not stored.
+- Booklet prompt `v4` now asks the model to select deterministic citation IDs.
+  The application owns and verifies the exact page number and excerpt.
+- The live `v4` run validated all citations but was rejected because it still
+  returned four indirect bidder-support company-fit notes. `v5` now removes
+  those unsafe notes deterministically before validation and storage.
+- The representative live `v5` run passed every deterministic check and was
+  stored. It analyzed all 35 pages, retained honest direct-capability gaps, and
+  cost approximately `$0.02050`.
+
+Status: Complete on 2026-06-14. The deterministic scorecard and representative
+live regressions now cover summaries, matching, weekly reports, and cited
+booklet analysis.
+
 ---
 
 ## Milestone 18 — Simple Authentication and Demo Workspace
@@ -1337,6 +1399,33 @@ demo without building enterprise account management.
 
 A reviewer can access a safe demo workspace, while authenticated users' private
 company data and tender decisions are isolated.
+
+### Implementation
+
+- Added database-backed users and one user-owned workspace per account.
+- Added signed HTTP-only seven-day sessions, sign in, sign out, and a polished
+  demo login page.
+- Added Next.js 16 Proxy redirects for private routes and repeated database
+  authorization inside private pages and every Server Action.
+- Kept public tender discovery available while hiding private decisions,
+  summaries, uploads, company data, chat, reports, notifications, and admin
+  workflows from anonymous visitors.
+- Scoped company profiles, tender decisions, summaries, chats, booklet uploads,
+  CSV imports, and monitoring runs to workspaces; existing Catalyft records were
+  backfilled into `primary-workspace`.
+- Added `npm run auth:seed-demo` to create or reset a safe demo login.
+- Added password-hashing, signed-session, tampering, and Proxy authorization
+  tests.
+
+### Verification
+
+- Anonymous `/company` requests redirect to `/sign-in?next=%2Fcompany`.
+- Anonymous `/tenders` requests remain publicly viewable.
+- A valid signed session can access the Catalyft workspace.
+- Existing private records were preserved and assigned to the demo workspace.
+
+Status: Initial implementation complete on 2026-06-14. Production rate
+limiting and safe automated demo-data reset remain part of Milestone 19.
 
 ---
 
@@ -1870,3 +1959,28 @@ The portfolio-release finish line is:
 
 > A polished deployed demo with trustworthy AI behavior, simple authentication,
 > reproducible evaluation evidence, and a compelling technical case study.
+
+---
+
+## Milestone 19 — Deployment And Reliable Portfolio Demo
+
+### Goal
+
+Make the portfolio build safe and predictable to host, demonstrate, monitor,
+and restore.
+
+### Implemented
+
+- database-backed limits for paid AI, uploads, CSV imports, and monitoring
+- database health endpoint with configuration indicators
+- secret-protected scheduler endpoint for bounded monitoring
+- structured JSON logs for health and scheduled monitoring
+- guarded demo-workspace reset command
+- deployment, migration, backup, and recovery documentation
+
+### Remaining external setup
+
+- select a hosting provider and hosted PostgreSQL service
+- configure production secrets, backups, alerts, and scheduler
+- move booklet files to private object storage before enabling public uploads
+- publish and verify the hosted portfolio URL

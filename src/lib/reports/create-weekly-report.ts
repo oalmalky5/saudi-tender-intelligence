@@ -15,11 +15,13 @@ export async function createWeeklyTenderReport(
   db: PrismaClient,
   dateFrom: Date,
   dateTo: Date,
+  companyProfileId = "primary",
+  workspaceId = "primary-workspace",
 ) {
   const [profile, tenders] = await Promise.all([
-    db.companyProfile.findUnique({ where: { id: "primary" } }),
+    db.companyProfile.findUnique({ where: { id: companyProfileId } }),
     db.tender.findMany({
-      where: { NOT: { decision: { is: { status: "IGNORED" } } } },
+      where: { decisions: { none: { workspaceId, status: "IGNORED" } } },
       orderBy: { publishedAt: "desc" },
       take: 250,
       select: {
@@ -39,7 +41,11 @@ export async function createWeeklyTenderReport(
         submissionDeadline: true,
         detailEnrichmentStatus: true,
         updatedAt: true,
-        decision: { select: { status: true, note: true } },
+        decisions: {
+          where: { workspaceId },
+          take: 1,
+          select: { status: true, note: true },
+        },
       },
     }),
   ]);
@@ -49,7 +55,10 @@ export async function createWeeklyTenderReport(
 
   const candidates = selectWeeklyReportCandidates(
     profile,
-    tenders,
+    tenders.map(({ decisions, ...tender }) => ({
+      ...tender,
+      decision: decisions[0] ?? null,
+    })),
     dateFrom,
     dateTo,
     new Date(),

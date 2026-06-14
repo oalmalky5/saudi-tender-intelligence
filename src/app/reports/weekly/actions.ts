@@ -2,6 +2,8 @@
 
 import { createWeeklyTenderReport } from "@/lib/reports/create-weekly-report";
 import { prisma } from "@/lib/prisma";
+import { requireWorkspace } from "@/lib/auth/session";
+import { enforceWorkspaceRateLimit, RATE_LIMITS } from "@/lib/reliability/rate-limit";
 import { revalidatePath } from "next/cache";
 
 export type WeeklyReportActionState = {
@@ -21,6 +23,10 @@ export async function generateWeeklyReportAction(
   formData: FormData,
 ): Promise<WeeklyReportActionState> {
   try {
+    const { workspace } = await requireWorkspace();
+    if (!workspace.companyProfile) {
+      throw new Error("Create a company profile before generating a weekly report.");
+    }
     const dateFrom = reportDate(formData.get("dateFrom"), false);
     const dateTo = reportDate(formData.get("dateTo"), true);
     if (dateFrom > dateTo) {
@@ -30,7 +36,14 @@ export async function generateWeeklyReportAction(
       throw new Error("Report date ranges are limited to 31 days.");
     }
 
-    const report = await createWeeklyTenderReport(prisma, dateFrom, dateTo);
+    await enforceWorkspaceRateLimit(workspace.id, RATE_LIMITS.paidAi);
+    const report = await createWeeklyTenderReport(
+      prisma,
+      dateFrom,
+      dateTo,
+      workspace.companyProfile.id,
+      workspace.id,
+    );
 
     revalidatePath("/reports/weekly");
     return {

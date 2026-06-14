@@ -37,10 +37,10 @@ export function TranslationControls({
         className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
       >
         {pending
-          ? pick(locale, "Translating...", "جارٍ الترجمة...")
+          ? pick(locale, "Improving translation...", "جارٍ تحسين الترجمة...")
           : hasTranslation
-            ? pick(locale, "Refresh translation", "تحديث الترجمة")
-            : pick(locale, "Translate to English", "ترجمة إلى الإنجليزية")}
+            ? pick(locale, "Improve with OpenAI", "تحسين باستخدام OpenAI")
+            : pick(locale, "Generate with OpenAI", "إنشاء باستخدام OpenAI")}
       </button>
       {state.message && (
         <p

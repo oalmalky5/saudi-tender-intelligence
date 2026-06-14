@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const citationSchema = z.object({
+  citationId: z.string().trim().min(1).max(40),
   pageNumber: z.number().int().positive(),
   excerpt: z.string().trim().min(1).max(800),
 });
@@ -35,10 +36,9 @@ const citationJsonSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    pageNumber: { type: "integer", minimum: 1 },
-    excerpt: { type: "string" },
+    citationId: { type: "string" },
   },
-  required: ["pageNumber", "excerpt"],
+  required: ["citationId"],
 } as const;
 
 const findingJsonSchema = {

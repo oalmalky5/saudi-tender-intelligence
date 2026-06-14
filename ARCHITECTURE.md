@@ -119,6 +119,8 @@ is a company match.
 ## Cost Controls
 
 - Paid AI actions are explicit and manual during development.
+- Database-backed workspace rate limits constrain paid AI, uploads, imports,
+  and monitoring across app instances.
 - Routine monitoring and notification matching do not call OpenAI.
 - Context sizes and candidate counts are bounded.
 - Unchanged summaries, translations, booklets, and analyses can be reused.
@@ -127,12 +129,14 @@ is a company match.
 
 ## Important Trade-Offs
 
-### One primary company profile
+### Simple user-owned workspaces
 
-The current local portfolio version uses one profile with the stable ID
-`primary`. This keeps the product workflow focused. User ownership and a simple
-demo workspace are planned before deployment; enterprise teams and role
-matrices are intentionally deferred.
+Each user owns one workspace, and private records are scoped to that workspace
+or its company profile. Signed HTTP-only sessions provide authentication;
+Next.js Proxy performs an optimistic redirect for private routes, while pages
+and Server Actions repeat authorization against the database. Public Etimad
+tender discovery remains shared. Enterprise teams, invitations, organization
+switching, and role matrices are intentionally deferred.
 
 ### Direct model calls instead of an agent framework
 
@@ -158,17 +162,23 @@ Local storage is appropriate for the current local-first build. A deployed
 version would need private object storage, authorization checks, malware
 scanning, retention rules, and deletion workflows.
 
-## Current Production Gaps
+## Portfolio Deployment Controls
 
-Before a public deployment, the application still needs:
+- signed HTTP-only sessions and database authorization
+- database-backed limits on expensive and externally dependent actions
+- a database health endpoint and structured operational logs
+- a secret-protected scheduler endpoint for bounded monitoring
+- a guarded reset command for mutable demo activity
+- deployment, migration, backup, and recovery procedures in `DEPLOYMENT.md`
 
-- authentication and ownership checks inside every private Server Action
-- a hosted PostgreSQL database and private document storage
-- rate limiting for expensive and upload actions
-- centralized logging, health checks, backups, and failure alerts
-- safe demo-data reset procedures
-- a production scheduler for the bounded monitoring command
+## Remaining Production Gaps
+
+Before a commercial public launch, the application still needs:
+
+- hosted PostgreSQL with configured backups and private document storage
+- a selected host, alerting provider, and registered production schedule
 - review of Etimad production-use permissions
+- stronger account lifecycle and operational controls for real customers
 
 Payments, team administration, enterprise SSO, outbound messaging, and
 high-availability infrastructure are outside the portfolio-release scope.

@@ -27,13 +27,13 @@ export function TenderChatControls({ locale }: { locale: Locale }) {
         required
         minLength={5}
         maxLength={2_000}
-        rows={4}
+        rows={3}
         placeholder={pick(
           locale,
           "Example: Which ICT tenders in Riyadh are closing this week?",
           "مثال: ما منافسات تقنية المعلومات في الرياض التي تغلق هذا الأسبوع؟",
         )}
-        className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 leading-7 outline-none focus:border-[var(--accent)]"
+        className="w-full rounded-2xl border border-[var(--border)] bg-white px-5 py-4 text-base leading-7 shadow-inner outline-none focus:border-[var(--accent)]"
       />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-xs leading-5 text-[var(--muted)]">
@@ -50,7 +50,7 @@ export function TenderChatControls({ locale }: { locale: Locale }) {
         >
           {pending
             ? pick(locale, "Searching and answering...", "جارٍ البحث والإجابة...")
-            : pick(locale, "Ask tender database", "اسأل قاعدة بيانات المنافسات")}
+            : pick(locale, "Send question", "إرسال السؤال")}
         </button>
       </div>
       {state.message && (

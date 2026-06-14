@@ -1,6 +1,7 @@
 import { dateLocale, pick, type Locale } from "@/lib/i18n/locale";
 import { localizedTenderText } from "@/lib/i18n/tender-text";
 import Link from "next/link";
+import { localizedMetadata, type MetadataTranslationMap } from "@/lib/translation/tender-metadata";
 
 import { AiMatchingControls } from "./ai-matching-controls";
 
@@ -43,13 +44,13 @@ function MatchList({ title, items }: { title: string; items: string[] }) {
   }
 
   return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+    <div className="rounded-xl border border-[var(--border)] bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--accent)]">
         {title}
       </p>
-      <ul className="mt-1.5 grid gap-1 text-sm leading-6">
+      <ul className="mt-2 grid gap-2 text-sm leading-6 text-[var(--muted)]">
         {items.map((item) => (
-          <li key={item}>- {item}</li>
+          <li key={item} className="border-l-2 border-[var(--accent-soft)] pl-3">{item}</li>
         ))}
       </ul>
     </div>
@@ -60,10 +61,12 @@ export function AiMatchingPanel({
   locale,
   profileUpdatedAt,
   run,
+  metadataTranslations,
 }: {
   locale: Locale;
   profileUpdatedAt: Date;
   run: StoredRun | null;
+  metadataTranslations: MetadataTranslationMap;
 }) {
   const dateFormatter = new Intl.DateTimeFormat(dateLocale(locale), {
     day: "numeric",
@@ -79,6 +82,11 @@ export function AiMatchingPanel({
       run.matches.some(
         (match) => match.tender.updatedAt > match.sourceTenderUpdatedAt,
       ));
+  const credibleMatches =
+    run?.matches.filter(
+      (match) =>
+        match.relevanceScore >= 40 && match.recommendedAction !== "IGNORE",
+    ).length ?? 0;
 
   return (
     <section className="mt-8 rounded-3xl border border-[var(--border)] bg-white p-6 sm:p-8">
@@ -123,6 +131,21 @@ export function AiMatchingPanel({
             )}
           </div>
 
+          {credibleMatches === 0 && (
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+              <p className="font-semibold">
+                {pick(locale, "No strong company matches were found.", "لم يتم العثور على مطابقات قوية للشركة.")}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-amber-900/80">
+                {pick(
+                  locale,
+                  "The ranked list below contains the closest available tenders for awareness and exploration. It should not be interpreted as a recommendation to bid.",
+                  "تتضمن القائمة أدناه أقرب المنافسات المتاحة للاستكشاف والاطلاع، ولا ينبغي اعتبارها توصية بالتقديم.",
+                )}
+              </p>
+            </div>
+          )}
+
           <div className="mt-6 grid gap-4">
             {run.matches.map((match) => {
               const title = localizedTenderText(
@@ -134,7 +157,7 @@ export function AiMatchingPanel({
               return (
                 <article
                   key={match.id}
-                  className="rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5"
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5 shadow-[0_8px_24px_rgba(20,55,43,0.04)]"
                 >
                   <div className="grid gap-5 lg:grid-cols-[5rem_minmax(0,1fr)]">
                     <div className="text-center">
@@ -163,8 +186,8 @@ export function AiMatchingPanel({
                       >
                         {title.value}
                       </Link>
-                      <p dir="rtl" lang="ar" className="mt-1 text-right text-sm text-[var(--muted)]">
-                        {match.tender.agencyNameArabic}
+                      <p className="mt-1 text-sm text-[var(--muted)]">
+                        {localizedMetadata(metadataTranslations, "agency", match.tender.agencyNameArabic, locale)}
                       </p>
                       <div className="mt-4 grid gap-4 md:grid-cols-3">
                         <MatchList title={pick(locale, "Why it matches", "أسباب المطابقة")} items={match.whyMatches} />

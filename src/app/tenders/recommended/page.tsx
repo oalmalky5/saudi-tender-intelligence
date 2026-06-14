@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireWorkspace } from "@/lib/auth/session";
 import { scoreTenderMatch } from "@/lib/matching/score-tender";
 import Link from "next/link";
 import { DecisionControls } from "../decision-controls";
@@ -8,6 +9,7 @@ import { getLocale } from "@/lib/i18n/locale-server";
 import { localizeMatchText } from "@/lib/i18n/match-text";
 import { localizedTenderText } from "@/lib/i18n/tender-text";
 import { AiMatchingPanel } from "./ai-matching-panel";
+import { loadMetadataTranslations, localizedMetadata } from "@/lib/translation/tender-metadata";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +35,15 @@ function scoreTone(score: number): string {
 }
 
 export default async function RecommendedTendersPage() {
+  const { workspace } = await requireWorkspace();
+  const profileId = workspace.companyProfile?.id ?? "";
   const locale = await getLocale();
-  const [profile, tenders, latestAiRun] = await Promise.all([
-    prisma.companyProfile.findUnique({ where: { id: "primary" } }),
+  const [profile, tenders, latestAiRun, metadataTranslations] = await Promise.all([
+    prisma.companyProfile.findUnique({ where: { workspaceId: workspace.id } }),
     prisma.tender.findMany({
-      where: { NOT: { decision: { is: { status: "IGNORED" } } } },
+      where: {
+        decisions: { none: { workspaceId: workspace.id, status: "IGNORED" } },
+      },
       orderBy: { publishedAt: "desc" },
       take: 120,
       select: {
@@ -53,11 +59,15 @@ export default async function RecommendedTendersPage() {
         tenderTypeNameArabic: true,
         submissionDeadline: true,
         detailEnrichmentStatus: true,
-        decision: { select: { status: true } },
+        decisions: {
+          where: { workspaceId: workspace.id },
+          take: 1,
+          select: { status: true },
+        },
       },
     }),
     prisma.tenderAiMatchRun.findFirst({
-      where: { companyProfileId: "primary" },
+      where: { companyProfileId: profileId },
       orderBy: { generatedAt: "desc" },
       include: {
         matches: {
@@ -77,6 +87,7 @@ export default async function RecommendedTendersPage() {
         },
       },
     }),
+    loadMetadataTranslations(prisma),
   ]);
 
   const recommendations = profile
@@ -166,6 +177,7 @@ export default async function RecommendedTendersPage() {
               locale={locale}
               profileUpdatedAt={profile.updatedAt}
               run={latestAiRun}
+              metadataTranslations={metadataTranslations}
             />
 
             {recommendations.length === 0 ? (
@@ -211,12 +223,8 @@ export default async function RecommendedTendersPage() {
                       >
                         {title.value}
                       </Link>
-                      <p
-                        dir="rtl"
-                        lang="ar"
-                        className="mt-2 text-right text-sm text-[var(--muted)]"
-                      >
-                        {tender.agencyNameArabic}
+                      <p className="mt-2 text-sm text-[var(--muted)]">
+                        {localizedMetadata(metadataTranslations, "agency", tender.agencyNameArabic, locale)}
                       </p>
 
                       {match.reasons.length > 0 ? (
@@ -258,13 +266,13 @@ export default async function RecommendedTendersPage() {
                       <p className="mt-4 text-xs text-[var(--muted)]">
                         {pick(locale, "Activity", "النشاط")}
                       </p>
-                      <p dir="rtl" lang="ar" className="mt-1 text-right">
-                        {tender.activityNameArabic ?? pick(locale, "Not provided", "غير متاح")}
+                      <p className="mt-1">
+                        {localizedMetadata(metadataTranslations, "activity", tender.activityNameArabic, locale) ?? pick(locale, "Not provided", "غير متاح")}
                       </p>
                       <div className="mt-5">
                         <DecisionControls
                           tenderId={tender.id}
-                          status={tender.decision?.status ?? null}
+                          status={tender.decisions[0]?.status ?? null}
                           compact
                           locale={locale}
                         />
