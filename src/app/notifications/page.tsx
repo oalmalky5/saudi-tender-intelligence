@@ -12,6 +12,7 @@ import {
   runMonitoringNow,
   saveNotificationSettings,
 } from "./actions";
+import { RunMonitoringButton } from "./run-monitoring-button";
 
 export const dynamic = "force-dynamic";
 
@@ -102,12 +103,7 @@ export default async function NotificationsPage({
             </p>
           </div>
           <form action={runMonitoringNow}>
-            <button
-              type="submit"
-              className="rounded-xl bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-white"
-            >
-              {pick(locale, "Run monitoring now", "تشغيل المراقبة الآن")}
-            </button>
+            <RunMonitoringButton locale={locale} />
           </form>
         </section>
 
