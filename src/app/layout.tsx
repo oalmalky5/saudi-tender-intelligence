@@ -10,6 +10,9 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Tender Intelligence",
   description: "Discover relevant Saudi government tenders.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default async function RootLayout({
