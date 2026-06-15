@@ -2,6 +2,7 @@
 
 import { useFormStatus } from "react-dom";
 
+import { PendingOperationProgress } from "@/app/pending-operation-progress";
 import { pick, type Locale } from "@/lib/i18n/locale";
 
 export function RunMonitoringButton({ locale }: { locale: Locale }) {
@@ -25,16 +26,11 @@ export function RunMonitoringButton({ locale }: { locale: Locale }) {
           : pick(locale, "Run monitoring now", "تشغيل المراقبة الآن")}
       </button>
       {pending && (
-        <p
-          aria-live="polite"
-          className="max-w-64 text-right text-xs leading-5 text-[var(--muted)]"
-        >
-          {pick(
-            locale,
-            "Checking Etimad, updating tender records, and creating relevant notifications. This can take a minute.",
-            "جارٍ التحقق من اعتماد وتحديث سجلات المنافسات وإنشاء التنبيهات المناسبة. قد يستغرق ذلك دقيقة.",
-          )}
-        </p>
+        <PendingOperationProgress
+          locale={locale}
+          message="Checking Etimad, updating tender records, and creating relevant notifications. This can take a minute."
+          messageArabic="جارٍ التحقق من اعتماد وتحديث سجلات المنافسات وإنشاء التنبيهات المناسبة. قد يستغرق ذلك دقيقة."
+        />
       )}
     </div>
   );

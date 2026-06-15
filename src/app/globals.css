@@ -541,6 +541,29 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+.operation-progress {
+  position: relative;
+  height: .35rem;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--accent-soft);
+}
+
+.operation-progress span {
+  position: absolute;
+  inset-block: 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-bright), var(--accent-deep));
+  animation: operation-progress 1.45s ease-in-out infinite;
+}
+
+@keyframes operation-progress {
+  from { inset-inline-start: -45%; }
+  to { inset-inline-start: 105%; }
+}
+
 @media (max-width: 1180px) {
   .app-sidebar { width: 5.1rem; padding: .8rem; }
   .brand-copy, .app-nav-link > span:last-child, .admin-link { display: none; }
