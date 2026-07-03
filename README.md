@@ -5,9 +5,10 @@ procurement. It imports real public Etimad tenders, makes them easier to
 discover, explains company relevance, and uses grounded AI for summaries,
 translation, document analysis, database chat, and weekly decision reports.
 
-This repository is currently a local-first portfolio product. It demonstrates
-the complete workflow and the engineering decisions behind it; it is not an
-official Etimad integration or a production Catalyft service.
+This repository contains the source code and technical documentation for a
+deployed portfolio product. It demonstrates the complete workflow and the
+engineering decisions behind it; it is not an official Etimad integration or a
+production Catalyft service.
 
 ## Why It Exists
 
@@ -23,6 +24,39 @@ workflow into a clearer decision process:
 5. Investigate shortlisted tenders through grounded summaries and cited
    booklet analysis.
 6. Monitor changes and produce a weekly action report.
+
+## Try The Live Demo
+
+Open the deployed product:
+
+[https://etimad-ai-production.up.railway.app/tenders](https://etimad-ai-production.up.railway.app/tenders)
+
+Public visitors can browse and search the tender discovery page. Private
+workspace features such as the company profile, saved decisions, AI chat,
+weekly reports, monitoring notifications, and booklet analysis require the demo
+account.
+
+### Demo Credentials
+
+```text
+Email: demo@etimad.local
+Password: demo12345
+```
+
+This is a shared portfolio demo workspace. Data may be updated or reset between
+demo sessions.
+
+### Suggested Walkthrough
+
+1. Open **Discover** and search or filter active tenders.
+2. Sign in with the demo account.
+3. Review the company profile and matching preferences.
+4. Open **Recommended** to see deterministic and AI-assisted fit analysis.
+5. Ask a grounded question in **Ask AI**.
+6. Review **Monitoring** notifications and run a manual check.
+7. Generate or inspect the **Weekly Report**.
+8. Open a tender detail page to view translation, summary, notes, and booklet
+   analysis workflows.
 
 ## Product Highlights
 
