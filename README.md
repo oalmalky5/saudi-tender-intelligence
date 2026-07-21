@@ -7,8 +7,7 @@ translation, document analysis, database chat, and weekly decision reports.
 
 This repository contains the source code and technical documentation for a
 deployed portfolio product. It demonstrates the complete workflow and the
-engineering decisions behind it; it is not an official Etimad integration or a
-production Catalyft service.
+engineering decisions behind it; it is not an official Etimad integration.
 
 ## Why It Exists
 
